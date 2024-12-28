@@ -1,0 +1,33 @@
+{
+  "name": "@obsidian-mcp-tools/mcp-server",
+  "version": "0.1.0",
+  "description": "Chat with your Obsidian notes in Claude Desktop and other MCP Clients. Requires obsidian-local-rest-api and smart-connections plugins.",
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "build": "bun build ./src/index.ts --compile --outfile ./dist/",
+    "build:linux": "bun build --compile --minify --sourcemap --target=bun-linux-x64-baseline ./src/index.ts --outfile dist/mcp-server-linux",
+    "build:mac-arm64": "bun build --compile --minify --sourcemap --target=bun-darwin-arm64 ./src/index.ts --outfile dist/mcp-server-mac-arm64",
+    "build:mac-x64": "bun build --compile --minify --sourcemap --target=bun-darwin-x64 ./src/index.ts --outfile dist/mcp-server-mac-x64",
+    "build:windows": "bun build --compile --minify --sourcemap --target=bun-windows-x64-baseline ./src/index.ts --outfile dist/mcp-server-windows",
+    "check": "tsc --noEmit",
+    "inspector": "npx @modelcontextprotocol/inspector bun src/index.ts",
+    "release": "run-s build:*",
+    "setup": "bun run ./scripts/install.ts",
+    "test": "bun test ./src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.0.4",
+    "acorn": "^8.14.0",
+    "acorn-walk": "^8.3.4",
+    "arktype": "2.0.0-rc.30",
+    "radash": "^12.1.0",
+    "shared": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prettier": "^3.4.2",
+    "typescript": "^5.3.3"
+  }
+}

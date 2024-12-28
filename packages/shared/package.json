@@ -1,0 +1,17 @@
+{
+  "name": "shared",
+  "module": "src/index.ts",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "arktype": "^2.0.0-rc.30"
+  }
+}

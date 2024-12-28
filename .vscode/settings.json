@@ -1,0 +1,13 @@
+{
+  "workbench.colorCustomizations": {
+    "activityBar.background": "#32167B",
+    "titleBar.activeBackground": "#451FAC",
+    "titleBar.activeForeground": "#FAF9FE"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "logViewer.watch": [
+    "~/Library/Logs/obsidian-mcp-tools/mcp-server.log",
+    "~/Library/Logs/obsidian-mcp-tools/obsidian-plugin.log",
+    "~/Library/Logs/Claude/*.log"
+  ]
+}

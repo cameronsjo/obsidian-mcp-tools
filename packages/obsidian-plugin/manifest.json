@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-mcp-tools",
+	"name": "Obsidian MCP Tools Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Chat with your notes in Claude Desktop and other MCP Clients. Requires obsidian-local-rest-api and smart-connections plugins.",
+	"author": "Jack Steam",
+	"authorUrl": "https://twiceright.dev",
+	"fundingUrl": "https://twiceright.dev",
+	"isDesktopOnly": true
+}
