@@ -26,7 +26,7 @@ const sveltePlugin: BunPlugin = {
 					filename: path,
 					generate: "client",
 					css: "injected",
-					dev: false,
+					dev: isProd,
 				});
 
 				return {
