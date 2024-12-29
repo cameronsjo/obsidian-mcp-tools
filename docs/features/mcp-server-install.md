@@ -28,8 +28,36 @@ The installation feature is implemented in the Obsidian plugin package under `sr
 
 ## Settings UI Requirements
 
-1. Display Elements:
+The settings UI is implemented as a Svelte component in `components/SettingsTab.svelte`.
 
+1. Component Structure:
+   ```svelte
+   <script lang="ts">
+     // Import Svelte stores for state management
+     import { installationStatus } from '../stores/status';
+     import { dependencies } from '../stores/dependencies';
+     
+     // Props from parent Settings.svelte
+     export let plugin: Plugin;
+   </script>
+
+   <!-- Installation status and controls -->
+   <div class="installation-status">
+     <!-- Dynamic content based on $installationStatus -->
+   </div>
+
+   <!-- Dependencies section -->
+   <div class="dependencies">
+     <!-- Dynamic content based on $dependencies -->
+   </div>
+
+   <!-- Links section -->
+   <div class="links">
+     <!-- External resource links -->
+   </div>
+   ```
+
+2. Display Elements:
    - Installation status indicator with version
    - Install/Update/Uninstall buttons
    - Dependency status and links
@@ -40,11 +68,13 @@ The installation feature is implemented in the Obsidian plugin package under `sr
      - Claude Desktop download page (when needed)
      - Required and recommended plugins
 
-2. Status States:
-   - Not Installed
-   - Installing
-   - Installed
-   - Update Available
+3. State Management:
+   - Uses Svelte stores for reactive state
+   - Status states:
+     - Not Installed
+     - Installing
+     - Installed
+     - Update Available
 
 ## Download Management
 
@@ -126,18 +156,21 @@ The installation feature is implemented in the Obsidian plugin package under `sr
 The feature follows a modular structure:
 ```
 src/features/mcp-server-install/
-├── components/       # UI components
-│   └── SettingsTab.ts
+├── components/       # Svelte components
+│   └── SettingsTab.svelte
 ├── services/        # Core functionality
 │   ├── config.ts    # Claude config management
 │   ├── download.ts  # Binary download
 │   ├── status.ts    # Installation status
 │   └── uninstall.ts # Cleanup operations
+├── stores/          # Svelte stores
+│   ├── status.ts    # Installation status store
+│   └── dependencies.ts # Dependencies status store
 ├── utils/           # Shared utilities
 │   └── openFolder.ts
 ├── constants.ts     # Configuration
 ├── types.ts         # Type definitions
-└── index.ts         # Feature setup
+└── index.ts         # Feature setup & component export
 ```
 
 ### Key Implementation Decisions
@@ -164,10 +197,12 @@ src/features/mcp-server-install/
    - Extensive logging for troubleshooting
 
 5. User Experience
+   - Reactive UI with Svelte components
    - One-click installation process
    - Direct access to logs and binaries
    - Clear dependency requirements
    - Links to all required and recommended plugins
+   - Real-time status updates through Svelte stores
 
 ### Recommended Plugins
 Added information about recommended plugins that enhance functionality:
