@@ -9,11 +9,10 @@ import {
   takeWhile,
   timer,
 } from "rxjs";
+import type { SmartConnections, Templater } from "shared";
 import type McpToolsPlugin from "src/main";
-import type { SmartSearch } from "../../../shared/src/types/plugin-smart-connections";
-import type { ITemplater } from "../../../shared/src/types/plugin-templater";
 
-interface Dependency<API> {
+export interface Dependency<API> {
   id: keyof Dependencies;
   name: string;
   required: boolean;
@@ -24,14 +23,14 @@ interface Dependency<API> {
 
 interface Dependencies {
   "obsidian-local-rest-api": Dependency<LocalRestApiPublicApi>;
-  "smart-connections": Dependency<SmartSearch>;
-  "templater-obsidian": Dependency<ITemplater>;
+  "smart-connections": Dependency<SmartConnections.SmartSearch>;
+  "templater-obsidian": Dependency<Templater.ITemplater>;
 }
 
 export const loadSmartSearchAPI = (plugin: McpToolsPlugin) =>
   interval(200).pipe(
     takeUntil(timer(5000)),
-    map((): Dependency<SmartSearch> => {
+    map((): Dependency<SmartConnections.SmartSearch> => {
       const api = typeof SmartSearch === "undefined" ? undefined : SmartSearch;
       return {
         id: "smart-connections",
@@ -65,7 +64,7 @@ export const loadLocalRestAPI = (plugin: McpToolsPlugin) =>
 export const loadTemplaterAPI = (plugin: McpToolsPlugin) =>
   interval(200).pipe(
     takeUntil(timer(5000)),
-    map((): Dependency<ITemplater> => {
+    map((): Dependency<Templater.ITemplater> => {
       const api = plugin.app.plugins.plugins["templater-obsidian"]?.templater;
       return {
         id: "templater-obsidian",

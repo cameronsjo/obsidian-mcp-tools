@@ -13,7 +13,8 @@
 	"type": "module",
 	"main": "main.js",
 	"scripts": {
-		"build": "tsc -noEmit -skipLibCheck && bun run bun.config.ts --prod",
+		"build": "bun run check && bun bun.config.ts --prod",
+		"check": "tsc --noEmit",
 		"dev": "bun --watch run bun.config.ts --watch",
 		"link": "bun scripts/link.ts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
