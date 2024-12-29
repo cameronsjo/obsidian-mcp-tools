@@ -1,18 +1,10 @@
 import { type } from "arktype";
 import { Request, Response } from "express";
-import { Notice, Plugin, TFile, normalizePath } from "obsidian";
+import { Notice, Plugin, TFile } from "obsidian";
 import { LocalRestApiPublicApi } from "obsidian-local-rest-api";
 import { shake } from "radash";
-import { throttleTime } from "rxjs";
 import { ExecutePromptParamsSchema, PromptArgAccessor } from "shared";
-import {
-	DownloadProgress,
-	downloadFile,
-	ensureDirectory,
-	getArch,
-	getDownloadUrl,
-	getPlatform,
-} from "./download";
+import { setup as setupMcpServerInstall } from "./features/mcp-server-install";
 import { logger } from "./logger";
 import {
 	loadLocalRestAPI,
@@ -62,61 +54,8 @@ export default class SmartSearchRestAPIPlugin extends Plugin {
 	private localRestApi: LocalRestApiPublicApi | undefined;
 
 	async onload() {
-		// Install feature
-		this.addCommand({
-			id: "setup-mcp-server",
-			name: "Download and install MCP server",
-			callback: async () => {
-				try {
-					const platform = getPlatform();
-					const arch = getArch();
-					const downloadUrl = getDownloadUrl(platform, arch);
-
-					const binDir = normalizePath(
-						`${this.app.vault.adapter.basePath}/${this.app.vault.configDir}/plugins/${this.manifest.id}/bin`,
-					);
-					await ensureDirectory(binDir);
-
-					const outputPath = normalizePath(
-						`${binDir}/${platform === "windows" ? "mcp-server.exe" : "mcp-server"}`,
-					);
-
-					const progressNotice = new Notice(
-						"Downloading MCP server...",
-						0,
-					);
-
-					const download$ = downloadFile(downloadUrl, outputPath);
-
-					download$.pipe(throttleTime(250)).subscribe({
-						next: (progress: DownloadProgress) => {
-							progressNotice.setMessage(
-								`Downloading MCP server: ${progress.percentage}%`,
-							);
-						},
-						error: (error: Error) => {
-							progressNotice.hide();
-							new Notice(
-								`Failed to download MCP server: ${error.message}`,
-							);
-							logger.error("Download failed:", { error });
-						},
-						complete: () => {
-							progressNotice.hide();
-							new Notice("MCP server downloaded successfully!");
-							logger.info("MCP server downloaded", {
-								outputPath,
-							});
-						},
-					});
-				} catch (error) {
-					new Notice(
-						`Failed to download MCP server: ${error instanceof Error ? error.message : String(error)}`,
-					);
-					logger.error("Download failed:", { error });
-				}
-			},
-		});
+		// Initialize features
+		await setupMcpServerInstall(this);
 
 		// Check for required dependencies
 		this.localRestApi = await loadLocalRestAPI(this.app, this.manifest);

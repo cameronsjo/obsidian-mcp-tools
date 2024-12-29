@@ -13,12 +13,15 @@ The installation feature is implemented in the Obsidian plugin package under `sr
 1. User Prerequisites:
 
    - Claude Desktop installed
-   - Local REST API plugin installed and configured
+   - Local REST API plugin installed and configured with API key
+   - (Optional) Templater plugin for enhanced functionality
+   - (Optional) Smart Connections plugin for enhanced search
 
 2. Installation Steps:
    - User navigates to plugin settings
-   - User enters OBSIDIAN_API_KEY (if not previously stored)
+   - Plugin verifies prerequisites and shows status
    - User initiates installation via button
+   - Plugin retrieves API key from Local REST API plugin
    - Plugin downloads appropriate binary
    - Plugin updates Claude config file
    - Plugin confirms successful installation
@@ -27,14 +30,15 @@ The installation feature is implemented in the Obsidian plugin package under `sr
 
 1. Display Elements:
 
-   - Installation status indicator
-   - API key input field (if not configured)
+   - Installation status indicator with version
    - Install/Update/Uninstall buttons
+   - Dependency status and links
    - Links to:
-     - Downloaded executable location
-     - Log folder location
+     - Downloaded executable location (with folder access)
+     - Log folder location (with folder access)
      - GitHub repository
-     - Claude Desktop download page (if needed)
+     - Claude Desktop download page (when needed)
+     - Required and recommended plugins
 
 2. Status States:
    - Not Installed
@@ -115,3 +119,80 @@ The installation feature is implemented in the Obsidian plugin package under `sr
    - Remove executable
    - Remove our entry from Claude config
    - Clear stored plugin data
+
+## Appendix: Implementation Insights
+
+### Feature Organization
+The feature follows a modular structure:
+```
+src/features/mcp-server-install/
+├── components/       # UI components
+│   └── SettingsTab.ts
+├── services/        # Core functionality
+│   ├── config.ts    # Claude config management
+│   ├── download.ts  # Binary download
+│   ├── status.ts    # Installation status
+│   └── uninstall.ts # Cleanup operations
+├── utils/           # Shared utilities
+│   └── openFolder.ts
+├── constants.ts     # Configuration
+├── types.ts         # Type definitions
+└── index.ts         # Feature setup
+```
+
+### Key Implementation Decisions
+
+1. API Key Management
+   - Removed manual API key input
+   - Automatically retrieved from Local REST API plugin
+   - Reduces user friction and potential errors
+
+2. Symlink Resolution
+   - Added robust symlink handling for binary paths
+   - Ensures correct operation even with complex vault setups
+   - Handles non-existent paths during resolution
+
+3. Status Management
+   - Unified status interface with version tracking
+   - Real-time status updates during operations
+   - Clear feedback for update availability
+
+4. Error Handling
+   - Comprehensive prerequisite validation
+   - Detailed error messages with next steps
+   - Proper cleanup on failures
+   - Extensive logging for troubleshooting
+
+5. User Experience
+   - One-click installation process
+   - Direct access to logs and binaries
+   - Clear dependency requirements
+   - Links to all required and recommended plugins
+
+### Recommended Plugins
+Added information about recommended plugins that enhance functionality:
+- Templater: For template-based operations
+- Smart Connections: For enhanced search capabilities
+- Local REST API: Required for Obsidian communication
+
+### Platform Compatibility
+Implemented robust platform detection and path handling:
+- Windows: Handles UNC paths and environment variables
+- macOS: Proper binary permissions and config paths
+- Linux: Flexible configuration for various distributions
+
+### Future Considerations
+1. Version Management
+   - Consider automated update checks
+   - Add update notifications
+   - Implement rollback capability
+
+2. Configuration
+   - Add backup/restore of Claude config
+   - Support custom binary locations
+   - Allow custom log paths
+
+3. Error Recovery
+   - Add self-repair functionality
+   - Implement health checks
+   - Add diagnostic tools
