@@ -1,7 +1,7 @@
 import { parse } from "acorn";
 import { simple } from "acorn-walk";
 import { type } from "arktype";
-import type { PromptParameter } from "../../shared/src/schemas";
+import type { PromptParameter } from "shared";
 
 const CallExpressionSchema = type({
   callee: {
