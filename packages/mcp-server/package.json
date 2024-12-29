@@ -7,8 +7,8 @@
   "scripts": {
     "build": "bun build ./src/index.ts --compile --outfile ./dist/",
     "build:linux": "bun build --compile --minify --sourcemap --target=bun-linux-x64-baseline ./src/index.ts --outfile dist/mcp-server-linux",
-    "build:mac-arm64": "bun build --compile --minify --sourcemap --target=bun-darwin-arm64 ./src/index.ts --outfile dist/mcp-server-mac-arm64",
-    "build:mac-x64": "bun build --compile --minify --sourcemap --target=bun-darwin-x64 ./src/index.ts --outfile dist/mcp-server-mac-x64",
+    "build:mac-arm64": "bun build --compile --minify --sourcemap --target=bun-darwin-arm64 ./src/index.ts --outfile dist/mcp-server-macos-arm64",
+    "build:mac-x64": "bun build --compile --minify --sourcemap --target=bun-darwin-x64 ./src/index.ts --outfile dist/mcp-server-macos-x64",
     "build:windows": "bun build --compile --minify --sourcemap --target=bun-windows-x64-baseline ./src/index.ts --outfile dist/mcp-server-windows",
     "check": "tsc --noEmit",
     "inspector": "npx @modelcontextprotocol/inspector bun src/index.ts",
