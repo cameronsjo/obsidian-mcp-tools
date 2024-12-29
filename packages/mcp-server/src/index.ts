@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
+import { version } from "process";
 import { logger } from "./logger.js";
 import { ObsidianServer } from "./server.js";
+import { getVersion } from "./version.js" with { type: "macro" };
 
 async function main() {
   try {
@@ -23,7 +25,18 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (process.argv.includes("--version")) {
+  getVersion()
+    .then((version) => {
+      console.log(version);
+    })
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
+} else {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
