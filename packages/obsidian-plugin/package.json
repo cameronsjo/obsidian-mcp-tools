@@ -13,8 +13,8 @@
 	"type": "module",
 	"main": "main.js",
 	"scripts": {
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && bun run bun.config.ts --prod",
+		"dev": "bun --watch run bun.config.ts --watch",
 		"link": "bun scripts/link.ts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"release": "run-s build"
@@ -25,14 +25,13 @@
 		"obsidian-local-rest-api": "^2.5.4",
 		"radash": "^12.1.0",
 		"rxjs": "^7.8.1",
-		"shared": "workspace:*"
+		"shared": "workspace:*",
+		"svelte": "^5.16.0"
 	},
 	"devDependencies": {
 		"@types/node": "^16.11.6",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
-		"builtin-modules": "3.3.0",
-		"esbuild": "0.17.3",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
 		"typescript": "^5.7.2"
