@@ -1,5 +1,3 @@
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import { type } from "arktype";
 import { zip } from "radash";
 
 /**
@@ -34,41 +32,3 @@ export const f = (strings: TemplateStringsArray, ...values: any[]) => {
     .join("")
     .trim();
 };
-
-/**
- * A Map-like data structure that automatically evicts the oldest entry when the maximum number of entries is reached.
- */
-export class CacheMap<K, V> extends Map<K, V> {
-  constructor(private readonly maxEntries: number) {
-    super();
-  }
-
-  set(key: K, value: V) {
-    if (this.size >= this.maxEntries) {
-      const oldest = this.keys().next().value;
-      if (oldest) this.delete(oldest);
-    }
-    return super.set(key, value);
-  }
-}
-
-export function formatMcpError(error: unknown) {
-  if (error instanceof McpError) {
-    return error;
-  }
-
-  if (error instanceof type.errors) {
-    const message = error.summary;
-    return new McpError(ErrorCode.InvalidParams, message);
-  }
-
-  if (type({ message: "string" }).allows(error)) {
-    return new McpError(ErrorCode.InternalError, error.message);
-  }
-
-  return new McpError(
-    ErrorCode.InternalError,
-    "An unexpected error occurred",
-    error,
-  );
-}

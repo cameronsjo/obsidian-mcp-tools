@@ -5,7 +5,7 @@ import {
   type Result,
 } from "@modelcontextprotocol/sdk/types.js";
 import { type, type Type } from "arktype";
-import { formatMcpError } from "./utilities.js";
+import { formatMcpError } from "./formatMcpError.js";
 import { logger } from "./logger.js";
 
 interface HandlerContext {
