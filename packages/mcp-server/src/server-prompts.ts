@@ -7,13 +7,9 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { type } from "arktype";
 import {
-  ApiTemplateExecutionResponse,
-  ApiVaultDirectoryResponse,
-  ApiVaultFileResponse,
   buildTemplateArgumentsSchema,
-  MIME_TYPE_OLRAPI_NOTE_JSON,
+  LocalRestAPI,
   PromptFrontmatterSchema,
-  type ApiTemplateExecutionParamsType,
   type PromptMetadata,
 } from "shared";
 import { logger } from "./logger";
@@ -29,7 +25,7 @@ export function setupObsidianPrompts(server: Server) {
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
     try {
       const { files } = await makeRequest(
-        ApiVaultDirectoryResponse,
+        LocalRestAPI.ApiVaultDirectoryResponse,
         VAULT_PROMPTS_PATH,
       );
       const prompts: PromptMetadata[] = (
@@ -40,10 +36,10 @@ export function setupObsidianPrompts(server: Server) {
 
             // Retrieve frontmatter and content from vault file
             const file = await makeRequest(
-              ApiVaultFileResponse,
+              LocalRestAPI.ApiVaultFileResponse,
               VAULT_PROMPTS_PATH + filename,
               {
-                headers: { Accept: MIME_TYPE_OLRAPI_NOTE_JSON },
+                headers: { Accept: LocalRestAPI.MIME_TYPE_OLRAPI_NOTE_JSON },
               },
             );
 
@@ -75,10 +71,10 @@ export function setupObsidianPrompts(server: Server) {
     try {
       // Get prompt content
       const { content: template, frontmatter } = await makeRequest(
-        ApiVaultFileResponse,
+        LocalRestAPI.ApiVaultFileResponse,
         VAULT_PROMPTS_PATH + params.name,
         {
-          headers: { Accept: MIME_TYPE_OLRAPI_NOTE_JSON },
+          headers: { Accept: LocalRestAPI.MIME_TYPE_OLRAPI_NOTE_JSON },
         },
       );
 
@@ -93,14 +89,15 @@ export function setupObsidianPrompts(server: Server) {
         );
       }
 
-      const templateExecutionArgs: ApiTemplateExecutionParamsType = {
-        name: params.name,
-        arguments: templateArgs,
-      };
+      const templateExecutionArgs: LocalRestAPI.ApiTemplateExecutionParamsType =
+        {
+          name: params.name,
+          arguments: templateArgs,
+        };
 
       // Process template through Templater plugin
       const { content } = await makeRequest(
-        ApiTemplateExecutionResponse,
+        LocalRestAPI.ApiTemplateExecutionResponse,
         "/templates/execute",
         {
           method: "POST",

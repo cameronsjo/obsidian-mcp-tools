@@ -5,18 +5,9 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { type } from "arktype";
 import {
-  ApiNoContentResponse,
-  ApiNoteJson,
-  ApiSearchResponse,
-  ApiSimpleSearchResponse,
-  ApiSmartSearchResponse,
-  ApiStatusResponse,
-  ApiTemplateExecutionResponse,
-  ApiVaultFileResponse,
+  LocalRestAPI,
   buildTemplateArgumentsSchema,
   ExecutePromptParamsSchema,
-  MIME_TYPE_OLRAPI_NOTE_JSON,
-  type ApiTemplateExecutionParamsType,
 } from "shared";
 import { logger } from "./logger.js";
 import { makeRequest } from "./makeRequest.js";
@@ -45,7 +36,7 @@ export function setupObsidianTools(server: Server) {
       "Returns basic details about the Obsidian Local REST API and authentication status. This is the only API request that does not require authentication.",
     ),
     async () => {
-      const data = await makeRequest(ApiStatusResponse, "/");
+      const data = await makeRequest(LocalRestAPI.ApiStatusResponse, "/");
       return {
         content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
       };
@@ -67,9 +58,13 @@ export function setupObsidianTools(server: Server) {
         args?.format === "json"
           ? "application/vnd.olrapi.note+json"
           : "text/markdown";
-      const data = await makeRequest(ApiNoteJson.or("string"), "/active/", {
-        headers: { Accept: format },
-      });
+      const data = await makeRequest(
+        LocalRestAPI.ApiNoteJson.or("string"),
+        "/active/",
+        {
+          headers: { Accept: format },
+        },
+      );
       const content =
         typeof data === "string" ? data : JSON.stringify(data, null, 2);
       return { content: [{ type: "text", text: content }] };
@@ -84,7 +79,7 @@ export function setupObsidianTools(server: Server) {
       },
     }).describe("Update the content of the active file open in Obsidian."),
     async ({ arguments: args }) => {
-      await makeRequest(ApiNoContentResponse, "/active/", {
+      await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
         method: "PUT",
         body: args.content,
       });
@@ -102,7 +97,7 @@ export function setupObsidianTools(server: Server) {
       },
     }).describe("Append content to the end of the currently-open note."),
     async ({ arguments: args }) => {
-      await makeRequest(ApiNoContentResponse, "/active/", {
+      await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
         method: "POST",
         body: args.content,
       });
@@ -136,7 +131,7 @@ export function setupObsidianTools(server: Server) {
         headers["Content-Type"] = args.contentType;
       }
 
-      await makeRequest(ApiNoContentResponse, "/active/", {
+      await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
         method: "PATCH",
         headers,
         body: args.content,
@@ -153,7 +148,9 @@ export function setupObsidianTools(server: Server) {
       arguments: "Record<string, unknown>",
     }).describe("Delete the currently-active file in Obsidian."),
     async () => {
-      await makeRequest(ApiNoContentResponse, "/active/", { method: "DELETE" });
+      await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
+        method: "DELETE",
+      });
       return {
         content: [{ type: "text", text: "File deleted successfully" }],
       };
@@ -175,7 +172,7 @@ export function setupObsidianTools(server: Server) {
       const query = args.newLeaf ? "?newLeaf=true" : "";
 
       await makeRequest(
-        ApiNoContentResponse,
+        LocalRestAPI.ApiNoContentResponse,
         `/open/${encodeURIComponent(args.filename)}${query}`,
         {
           method: "POST",
@@ -205,11 +202,15 @@ export function setupObsidianTools(server: Server) {
           ? "application/vnd.olrapi.dataview.dql+txt"
           : "application/vnd.olrapi.jsonlogic+json";
 
-      const data = await makeRequest(ApiSearchResponse, "/search/", {
-        method: "POST",
-        headers: { "Content-Type": contentType },
-        body: args.query,
-      });
+      const data = await makeRequest(
+        LocalRestAPI.ApiSearchResponse,
+        "/search/",
+        {
+          method: "POST",
+          headers: { "Content-Type": contentType },
+          body: args.query,
+        },
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
@@ -236,7 +237,7 @@ export function setupObsidianTools(server: Server) {
       });
 
       const data = await makeRequest(
-        ApiSimpleSearchResponse,
+        LocalRestAPI.ApiSimpleSearchResponse,
         `/search/simple/?${query}`,
         {
           method: "POST",
@@ -268,10 +269,14 @@ export function setupObsidianTools(server: Server) {
       },
     }).describe("Search for documents semantically matching a text string."),
     async ({ arguments: args }) => {
-      const data = await makeRequest(ApiSmartSearchResponse, `/search/smart`, {
-        method: "POST",
-        body: JSON.stringify(args),
-      });
+      const data = await makeRequest(
+        LocalRestAPI.ApiSmartSearchResponse,
+        `/search/smart`,
+        {
+          method: "POST",
+          body: JSON.stringify(args),
+        },
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
@@ -291,7 +296,10 @@ export function setupObsidianTools(server: Server) {
     ),
     async ({ arguments: args }) => {
       const path = args.directory ? `${args.directory}/` : "";
-      const data = await makeRequest(ApiVaultFileResponse, `/vault/${path}`);
+      const data = await makeRequest(
+        LocalRestAPI.ApiVaultFileResponse,
+        `/vault/${path}`,
+      );
       return {
         content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
       };
@@ -312,7 +320,7 @@ export function setupObsidianTools(server: Server) {
           ? "application/vnd.olrapi.note+json"
           : "text/markdown";
       const data = await makeRequest(
-        ApiVaultFileResponse.or("string"),
+        LocalRestAPI.ApiVaultFileResponse.or("string"),
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           headers: { Accept: format },
@@ -340,7 +348,7 @@ export function setupObsidianTools(server: Server) {
     }).describe("Create a new file in your vault or update an existing one."),
     async ({ arguments: args }) => {
       await makeRequest(
-        ApiNoContentResponse,
+        LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           method: "PUT",
@@ -363,7 +371,7 @@ export function setupObsidianTools(server: Server) {
     }).describe("Append content to a new or existing file."),
     async ({ arguments: args }) => {
       await makeRequest(
-        ApiNoContentResponse,
+        LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           method: "POST",
@@ -403,7 +411,7 @@ export function setupObsidianTools(server: Server) {
       }
 
       await makeRequest(
-        ApiNoContentResponse,
+        LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           method: "PATCH",
@@ -426,7 +434,7 @@ export function setupObsidianTools(server: Server) {
     }).describe("Delete a file from your vault."),
     async ({ arguments: args }) => {
       await makeRequest(
-        ApiNoContentResponse,
+        LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           method: "DELETE",
@@ -446,10 +454,10 @@ export function setupObsidianTools(server: Server) {
     async ({ arguments: args }) => {
       // Get prompt content
       const data = await makeRequest(
-        ApiVaultFileResponse,
+        LocalRestAPI.ApiVaultFileResponse,
         `/vault/Prompts/${args.name}.md`,
         {
-          headers: { Accept: MIME_TYPE_OLRAPI_NOTE_JSON },
+          headers: { Accept: LocalRestAPI.MIME_TYPE_OLRAPI_NOTE_JSON },
         },
       );
 
@@ -462,14 +470,15 @@ export function setupObsidianTools(server: Server) {
         throw formatMcpError(validArgs);
       }
 
-      const templateExecutionArgs: ApiTemplateExecutionParamsType = {
-        name: args.name,
-        arguments: validArgs,
-      };
+      const templateExecutionArgs: LocalRestAPI.ApiTemplateExecutionParamsType =
+        {
+          name: args.name,
+          arguments: validArgs,
+        };
 
       // Process template through Templater plugin
       const response = await makeRequest(
-        ApiTemplateExecutionResponse,
+        LocalRestAPI.ApiTemplateExecutionResponse,
         "/templates/execute",
         {
           method: "POST",
