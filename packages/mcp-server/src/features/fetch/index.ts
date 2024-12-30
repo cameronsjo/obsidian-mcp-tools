@@ -53,8 +53,9 @@ export function setup(tools: ToolRegistry, server: Server) {
 
         const maxLength = args.maxLength || 5000;
         const startIndex = args.startIndex || 0;
+        const totalLength = content.length;
 
-        if (content.length > maxLength) {
+        if (totalLength > maxLength) {
           content = content.substring(startIndex, startIndex + maxLength);
           content += `\n\n<error>Content truncated. Call the fetch tool with a startIndex of ${
             startIndex + maxLength
@@ -65,11 +66,21 @@ export function setup(tools: ToolRegistry, server: Server) {
           url: args.url,
           contentLength: content.length,
         });
+
         return {
           content: [
             {
               type: "text",
               text: `${prefix}Contents of ${args.url}:\n${content}`,
+            },
+            {
+              type: "text",
+              text: `Pagination: ${JSON.stringify({
+                totalLength,
+                startIndex,
+                endIndex: startIndex + content.length,
+                hasMore: true,
+              })}`,
             },
           ],
         };

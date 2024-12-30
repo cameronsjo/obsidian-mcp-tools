@@ -1,3 +1,4 @@
+import { logger } from "$/shared";
 import TurndownService from "turndown";
 
 /**
@@ -39,8 +40,7 @@ function resolveUrl(base: string, path: string): string {
  * await Bun.write("playground/bcurious-gate-44.md", md);
  * ```
  */
-
-export function convertHtmlToMarkdown(html: string, baseUrl?: string): string {
+export function convertHtmlToMarkdown(html: string, baseUrl: string): string {
   const turndownService = new TurndownService({
     headingStyle: "atx",
     hr: "---",
@@ -48,34 +48,41 @@ export function convertHtmlToMarkdown(html: string, baseUrl?: string): string {
     codeBlockStyle: "fenced",
   });
 
-  if (baseUrl) {
-    // Extend the anchor rule to handle URL resolution
-    turndownService
-      .addRule("anchor", {
-        filter: "a",
-        // @ts-expect-error - We know this node is an anchor element
-        replacement: function (content, node: HTMLAnchorElement) {
-          const href = node.getAttribute("href");
-          if (!href) return content;
+  const rewriter = new HTMLRewriter()
+    .on("script,style,meta,template,link", {
+      element(element) {
+        element.remove();
+      },
+    })
+    .on("a", {
+      element(element) {
+        const href = element.getAttribute("href");
+        if (href) {
+          element.setAttribute("href", resolveUrl(baseUrl, href));
+        }
+      },
+    })
+    .on("img", {
+      element(element) {
+        const src = element.getAttribute("src");
+        if (src?.startsWith("data:")) {
+          element.remove();
+        } else if (src) {
+          element.setAttribute("src", resolveUrl(baseUrl, src));
+        }
+      },
+    });
 
-          const url = resolveUrl(baseUrl, href);
-          const title = node.getAttribute("title");
-          const titlePart = title ? ` "${title}"` : "";
-
-          return `[${content}](${url}${titlePart})`;
-        },
-      })
-      .addRule("img", {
-        filter: "img",
-        // @ts-expect-error - We know this node is an image element
-        replacement: function (content, node: HTMLImageElement) {
-          const alt = node.getAttribute("alt") || "";
-          const src = node.getAttribute("src") || "";
-
-          return `![${alt}](${resolveUrl(baseUrl, src)})`;
-        },
-      });
+  let finalHtml = html;
+  if (html.includes("<article")) {
+    const articleStart = html.indexOf("<article");
+    const articleEnd = html.lastIndexOf("</article>") + 10;
+    finalHtml = html.substring(articleStart, articleEnd);
   }
 
-  return turndownService.turndown(html);
+  return turndownService
+    .turndown(rewriter.transform(finalHtml))
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\[\n+/g, "[")
+    .replace(/\n+\]/g, "]");
 }
