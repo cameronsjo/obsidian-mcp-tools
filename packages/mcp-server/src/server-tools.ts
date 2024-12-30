@@ -295,7 +295,9 @@ export function setupObsidianTools(server: Server) {
     async ({ arguments: args }) => {
       const path = args.directory ? `${args.directory}/` : "";
       const data = await makeRequest(
-        LocalRestAPI.ApiVaultFileResponse,
+        LocalRestAPI.ApiVaultFileResponse.or(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+        ),
         `/vault/${path}`,
       );
       return {
@@ -313,12 +315,12 @@ export function setupObsidianTools(server: Server) {
       },
     }).describe("Get the content of a file from your vault."),
     async ({ arguments: args }) => {
-      const format =
-        args.format === "json"
-          ? "application/vnd.olrapi.note+json"
-          : "text/markdown";
+      const isJson = args.format === "json";
+      const format = isJson
+        ? "application/vnd.olrapi.note+json"
+        : "text/markdown";
       const data = await makeRequest(
-        LocalRestAPI.ApiVaultFileResponse.or("string"),
+        isJson ? LocalRestAPI.ApiNoteJson : LocalRestAPI.ApiContentResponse,
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           headers: { Accept: format },

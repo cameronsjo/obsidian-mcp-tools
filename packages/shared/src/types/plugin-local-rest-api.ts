@@ -30,18 +30,41 @@ export const ApiNoteJson = type({
 });
 
 /**
+ * Defines the structure of a plugin manifest, which contains metadata about a plugin.
+ * This type is used to represent the response from the API's root endpoint, providing
+ * basic server details and authentication status.
+ */
+const ApiPluginManifest = type({
+  id: "string",
+  name: "string",
+  version: "string",
+  minAppVersion: "string",
+  description: "string",
+  author: "string",
+  authorUrl: "string",
+  isDesktopOnly: "boolean",
+  dir: "string",
+});
+
+/**
  * Response from the root endpoint providing basic server details and authentication status
  * Content-Type: application/json
  * GET / - This is the only API request that does not require authentication
  */
 export const ApiStatusResponse = type({
-  authenticated: "boolean",
-  ok: "string",
-  service: "string",
+  status: "string",
+  manifest: ApiPluginManifest,
   versions: {
     obsidian: "string",
     self: "string",
   },
+  service: "string",
+  authenticated: "boolean",
+  certificateInfo: {
+    validityDays: "number",
+    regenerateRecommended: "boolean",
+  },
+  apiExtensions: ApiPluginManifest.array(),
 });
 
 /**
