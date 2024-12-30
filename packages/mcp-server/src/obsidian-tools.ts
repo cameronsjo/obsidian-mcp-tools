@@ -1,3 +1,10 @@
+import {
+  formatMcpError,
+  logger,
+  makeRequest,
+  parseTemplateParameters,
+  type ToolRegistry,
+} from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,
@@ -5,18 +12,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { type } from "arktype";
 import {
-  LocalRestAPI,
   buildTemplateArgumentsSchema,
   ExecutePromptParamsSchema,
+  LocalRestAPI,
 } from "shared";
-import { logger } from "./logger.js";
-import { makeRequest } from "./makeRequest.js";
-import tools from "./registry.js";
-import { formatMcpError } from "./utilities.js";
-import { parseTemplateParameters } from "./parseTemplateParameters.js";
-import { ApiPatchParameters } from "../../shared/src/types/plugin-local-rest-api.js";
 
-export function setupObsidianTools(server: Server) {
+export function setupObsidianTools(tools: ToolRegistry, server: Server) {
   // Status
   tools.register(
     type({
@@ -389,7 +390,7 @@ export function setupObsidianTools(server: Server) {
       name: '"patch_vault_file"',
       arguments: type({
         filename: "string",
-      }).and(ApiPatchParameters),
+      }).and(LocalRestAPI.ApiPatchParameters),
     }).describe(
       "Insert or modify content in a file relative to a heading, block reference, or frontmatter field.",
     ),

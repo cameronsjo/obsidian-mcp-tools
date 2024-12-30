@@ -1,11 +1,13 @@
+import { logger, type ToolRegistry, ToolRegistryClass } from "$/shared";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { logger } from "./logger.js";
-import { setupObsidianPrompts } from "./server-prompts.js";
-import { setupObsidianTools } from "./server-tools.js";
+import { setup as setupFetchTools } from "./features/fetch/index.js";
+import { setupObsidianPrompts } from "./obsidian-prompts.js";
+import { setupObsidianTools } from "./obsidian-tools.js";
 
-export class ObsidianServer {
+export class ObsidianMcpServer {
   private server: Server;
+  private tools: ToolRegistry;
 
   constructor() {
     this.server = new Server(
@@ -21,6 +23,8 @@ export class ObsidianServer {
       },
     );
 
+    this.tools = new ToolRegistryClass();
+
     this.setupHandlers();
 
     // Error handling
@@ -35,8 +39,9 @@ export class ObsidianServer {
   }
 
   private setupHandlers() {
-    setupObsidianTools(this.server);
     setupObsidianPrompts(this.server);
+    setupObsidianTools(this.tools, this.server);
+    setupFetchTools(this.tools, this.server);
   }
 
   async run() {

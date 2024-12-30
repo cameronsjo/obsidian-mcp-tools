@@ -1,3 +1,9 @@
+import {
+  formatMcpError,
+  logger,
+  makeRequest,
+  parseTemplateParameters,
+} from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   ErrorCode,
@@ -12,10 +18,6 @@ import {
   PromptFrontmatterSchema,
   type PromptMetadata,
 } from "shared";
-import { logger } from "./logger";
-import { makeRequest } from "./makeRequest";
-import { formatMcpError } from "./utilities";
-import { parseTemplateParameters } from "./parseTemplateParameters";
 
 // TODO: make prompt folder location configurable
 const VAULT_PROMPTS_NAME = "Prompts";

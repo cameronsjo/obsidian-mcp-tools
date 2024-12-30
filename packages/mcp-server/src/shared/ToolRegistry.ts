@@ -33,7 +33,7 @@ type ResultSchema = typeof resultSchema.infer;
  * the server. It is a map of request schemas to request handlers
  * that provides a list of available tools and a method to handle requests.
  */
-class _ToolRegistry<
+export class ToolRegistryClass<
   TSchema extends Type<
     {
       name: string;
@@ -115,6 +115,19 @@ class _ToolRegistry<
   };
 }
 
-const tools = new _ToolRegistry();
-export type ToolRegistry = typeof tools;
-export default tools;
+export type ToolRegistry = ToolRegistryClass<
+  Type<
+    {
+      name: string;
+      arguments?: Record<string, unknown>;
+    },
+    {}
+  >,
+  (
+    request: {
+      name: string;
+      arguments?: Record<string, unknown>;
+    },
+    context: HandlerContext,
+  ) => Promise<Result>
+>;

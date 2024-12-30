@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-import { version } from "process";
-import { logger } from "./logger.js";
-import { ObsidianServer } from "./server.js";
+import { logger } from "$/shared";
+import { ObsidianMcpServer } from "./server.js";
 import { getVersion } from "./version.js" with { type: "macro" };
 
 async function main() {
@@ -13,7 +12,7 @@ async function main() {
     }
 
     logger.debug("Starting Obsidian MCP server...");
-    const server = new ObsidianServer();
+    const server = new ObsidianMcpServer();
     await server.run();
     logger.debug("Obsidian MCP server is running");
   } catch (error) {

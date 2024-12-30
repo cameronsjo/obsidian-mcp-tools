@@ -1,6 +1,6 @@
-import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
-import { logger } from "./logger";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { type, type Type } from "arktype";
+import { logger } from "./logger";
 
 // Default to HTTPS port, fallback to HTTP if specified
 const USE_HTTP = process.env.OBSIDIAN_USE_HTTP === "true";
@@ -36,7 +36,6 @@ export async function makeRequest<
   }
 
   const url = `${BASE_URL}${path}`;
-  // logger.debug("Making request to Obsidian API", { url, init });
   const response = await fetch(url, {
     ...init,
     headers: {
