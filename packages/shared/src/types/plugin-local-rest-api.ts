@@ -198,22 +198,36 @@ export const ApiVaultFileResponse = type({
  * Parameters for patching a file or document in the Obsidian plugin's REST API.
  * This type defines the expected request body for the patch operation.
  *
- * @property operation - The type of patch operation to perform, one of 'append', 'prepend', or 'replace'.
- * @property targetType - The type of target to patch, one of 'heading', 'block', or 'frontmatter'.
- * @property target - The target string to patch, e.g. the heading or block text.
- * @property targetDelimiter - An optional delimiter to use when targeting a specific block or heading.
- * @property trimTargetWhitespace - An optional flag to trim whitespace from the target before patching.
- * @property content - The content to patch into the target.
- * @property contentType - The optional content type of the patch content, either 'text/markdown' or 'application/json'.
+ * @property operation - Specifies how to modify the content: append (add after), prepend (add before), or replace existing content
+ * @property targetType - Identifies what to modify: a section under a heading, a referenced block, or a frontmatter field
+ * @property target - The identifier - either heading path (e.g. 'Heading 1::Subheading 1:1'), block reference ID, or frontmatter field name
+ * @property targetDelimiter - The separator used in heading paths to indicate nesting (default '::')
+ * @property trimTargetWhitespace - Whether to remove whitespace from target identifier before matching (default: false)
+ * @property content - The actual content to insert, append, or use as replacement
+ * @property contentType - Format of the content - use application/json for structured data like table rows or frontmatter values
  */
 export const ApiPatchParameters = type({
-  operation: "'append' | 'prepend' | 'replace'",
-  targetType: "'heading' | 'block' | 'frontmatter'",
-  target: "string",
-  "targetDelimiter?": "string",
-  "trimTargetWhitespace?": "boolean",
-  content: "string",
-  "contentType?": "'text/markdown' | 'application/json'",
+  operation: type("'append' | 'prepend' | 'replace'").describe(
+    "Specifies how to modify the content: append (add after), prepend (add before), or replace existing content"
+  ),
+  targetType: type("'heading' | 'block' | 'frontmatter'").describe(
+    "Identifies what to modify: a section under a heading, a referenced block, or a frontmatter field"
+  ),
+  target: type("string").describe(
+    "The identifier - either heading path (e.g. 'Heading 1::Subheading 1:1'), block reference ID, or frontmatter field name"
+  ),
+  "targetDelimiter?": type("string").describe(
+    "The separator used in heading paths to indicate nesting (default '::')"
+  ),
+  "trimTargetWhitespace?": type("boolean").describe(
+    "Whether to remove whitespace from target identifier before matching (default: false)"
+  ),
+  content: type("string").describe(
+    "The actual content to insert, append, or use as replacement"
+  ),
+  "contentType?": type("'text/markdown' | 'application/json'").describe(
+    "Format of the content - use application/json for structured data like table rows or frontmatter values"
+  ),
 });
 
 /**
