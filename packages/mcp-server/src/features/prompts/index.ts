@@ -18,10 +18,7 @@ import {
   PromptFrontmatterSchema,
   type PromptMetadata,
 } from "shared";
-
-// TODO: make prompt folder location configurable
-const VAULT_PROMPTS_NAME = "Prompts";
-const VAULT_PROMPTS_PATH = `/vault/${VAULT_PROMPTS_NAME}/`;
+import { VAULT_PROMPTS_PATH } from "./constants";
 
 export function setupObsidianPrompts(server: Server) {
   server.setRequestHandler(ListPromptsRequestSchema, async () => {

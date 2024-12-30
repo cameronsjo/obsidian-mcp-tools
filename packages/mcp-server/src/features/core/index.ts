@@ -1,9 +1,15 @@
 import { logger, type ToolRegistry, ToolRegistryClass } from "$/shared";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { setup as setupFetchTools } from "./features/fetch/index.js";
-import { setupObsidianPrompts } from "./obsidian-prompts.js";
-import { setupObsidianTools } from "./obsidian-tools.js";
+import { registerFetchTool } from "../fetch";
+import { registerLocalRestApiTools } from "../local-rest-api";
+import { setupObsidianPrompts } from "../prompts";
+import { registerSmartConnectionsTools } from "../smart-connections";
+import { registerTemplaterTools } from "../templates";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 
 export class ObsidianMcpServer {
   private server: Server;
@@ -40,8 +46,21 @@ export class ObsidianMcpServer {
 
   private setupHandlers() {
     setupObsidianPrompts(this.server);
-    setupObsidianTools(this.tools, this.server);
-    setupFetchTools(this.tools, this.server);
+
+    registerFetchTool(this.tools, this.server);
+    registerLocalRestApiTools(this.tools, this.server);
+    registerSmartConnectionsTools(this.tools);
+    registerTemplaterTools(this.tools);
+
+    this.server.setRequestHandler(ListToolsRequestSchema, this.tools.list);
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      logger.debug("Handling request", { request });
+      const response = await this.tools.dispatch(request.params, {
+        server: this.server,
+      });
+      logger.debug("Request handled", { response });
+      return response;
+    });
   }
 
   async run() {

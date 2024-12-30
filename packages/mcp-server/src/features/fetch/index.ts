@@ -5,7 +5,7 @@ import { type } from "arktype";
 import { DEFAULT_USER_AGENT } from "./constants";
 import { convertHtmlToMarkdown } from "./services/markdown";
 
-export function setup(tools: ToolRegistry, server: Server) {
+export function registerFetchTool(tools: ToolRegistry, server: Server) {
   tools.register(
     type({
       name: '"fetch"',

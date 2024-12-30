@@ -1,15 +1,10 @@
 import {
   formatMcpError,
-  logger,
   makeRequest,
   parseTemplateParameters,
   type ToolRegistry,
 } from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
 import { type } from "arktype";
 import {
   buildTemplateArgumentsSchema,
@@ -17,8 +12,8 @@ import {
   LocalRestAPI,
 } from "shared";
 
-export function setupObsidianTools(tools: ToolRegistry, server: Server) {
-  // Status
+export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
+  // GET Status
   tools.register(
     type({
       name: '"get_server_info"',
@@ -34,7 +29,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
-  // Active File
+  // GET Active File
   tools.register(
     type({
       name: '"get_active_file"',
@@ -62,6 +57,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // PUT Active File
   tools.register(
     type({
       name: '"update_active_file"',
@@ -80,6 +76,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // POST Active File
   tools.register(
     type({
       name: '"append_to_active_file"',
@@ -98,6 +95,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // PATCH Active File
   tools.register(
     type({
       name: '"patch_active_file"',
@@ -141,6 +139,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // DELETE Active File
   tools.register(
     type({
       name: '"delete_active_file"',
@@ -156,10 +155,10 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
-  // Open
+  // POST Open File in Obsidian UI
   tools.register(
     type({
-      name: '"open_file_in_obsidian"',
+      name: '"show_file_in_obsidian"',
       arguments: {
         filename: "string",
         "newLeaf?": "boolean",
@@ -184,7 +183,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
-  // Search
+  // POST Search via Dataview or JsonLogic
   tools.register(
     type({
       name: '"search_vault"',
@@ -217,6 +216,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // POST Simple Search
   tools.register(
     type({
       name: '"search_vault_simple"',
@@ -249,41 +249,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
-  tools.register(
-    type({
-      name: '"search_vault_smart"',
-      arguments: {
-        query: type("string>0").describe("A search phrase for semantic search"),
-        "filter?": {
-          "folders?": type("string[]").describe(
-            'An array of folder names to include. For example, ["Public", "Work"]',
-          ),
-          "excludeFolders?": type("string[]").describe(
-            'An array of folder names to exclude. For example, ["Private", "Archive"]',
-          ),
-          "limit?": type("number>0").describe(
-            "The maximum number of results to return",
-          ),
-        },
-      },
-    }).describe("Search for documents semantically matching a text string."),
-    async ({ arguments: args }) => {
-      const data = await makeRequest(
-        LocalRestAPI.ApiSmartSearchResponse,
-        `/search/smart`,
-        {
-          method: "POST",
-          body: JSON.stringify(args),
-        },
-      );
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-      };
-    },
-  );
-
-  // Vault Files & Directories
+  // GET Vault Files or Directories List
   tools.register(
     type({
       name: '"list_vault_files"',
@@ -307,6 +273,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // GET Vault File Content
   tools.register(
     type({
       name: '"get_vault_file"',
@@ -339,6 +306,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // PUT Vault File Content
   tools.register(
     type({
       name: '"create_vault_file"',
@@ -362,6 +330,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // POST Vault File Content
   tools.register(
     type({
       name: '"append_to_vault_file"',
@@ -385,6 +354,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // PATCH Vault File Content
   tools.register(
     type({
       name: '"patch_vault_file"',
@@ -431,6 +401,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // DELETE Vault File Content
   tools.register(
     type({
       name: '"delete_vault_file"',
@@ -452,6 +423,7 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
     },
   );
 
+  // POST Execute Templater Template
   tools.register(
     type({
       name: '"execute_template"',
@@ -498,14 +470,4 @@ export function setupObsidianTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
-
-  server.setRequestHandler(ListToolsRequestSchema, tools.list);
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    logger.debug("Handling request", { request });
-    const response = await tools.dispatch(request.params, {
-      server,
-    });
-    logger.debug("Request handled", { response });
-    return response;
-  });
 }

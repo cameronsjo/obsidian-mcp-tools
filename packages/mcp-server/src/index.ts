@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { logger } from "$/shared";
-import { ObsidianMcpServer } from "./server.js";
-import { getVersion } from "./version.js" with { type: "macro" };
+import { ObsidianMcpServer } from "./features/core";
+import { getVersion } from "./features/version" with { type: "macro" };
 
 async function main() {
   try {
