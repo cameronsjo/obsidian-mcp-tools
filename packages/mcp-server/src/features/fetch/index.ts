@@ -11,11 +11,17 @@ export function setup(tools: ToolRegistry, server: Server) {
       name: '"fetch"',
       arguments: {
         url: "string",
-        maxLength: "number?",
-        startIndex: "number?",
-        raw: "boolean?",
+        "maxLength?": type("number").describe("Limit response length."),
+        "startIndex?": type("number").describe(
+          "Supports paginated retrieval of content.",
+        ),
+        "raw?": type("boolean").describe(
+          "Returns raw HTML content if raw=true.",
+        ),
       },
-    }).describe("Fetch a URL and extract its contents as markdown"),
+    }).describe(
+      "Reads and returns the content of any web page. Returns the content in Markdown format by default, or can return raw HTML if raw=true parameter is set. Supports pagination through maxLength and startIndex parameters.",
+    ),
     async ({ arguments: args }) => {
       logger.info("Fetching URL", { url: args.url });
 
