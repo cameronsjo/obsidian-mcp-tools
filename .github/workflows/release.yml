@@ -37,6 +37,7 @@ jobs:
         id: get_release
         uses: actions/github-script@v7
         with:
+          result-encoding: string  # This tells the action to return a raw string
           script: |
             const release = await github.rest.repos.getRelease({
               owner: context.repo.owner,
