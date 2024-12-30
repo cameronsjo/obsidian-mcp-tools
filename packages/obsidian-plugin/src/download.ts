@@ -4,7 +4,7 @@ import https from "https";
 import os from "os";
 import path from "path";
 import { Observable } from "rxjs";
-import { logger } from "./logger";
+import { logger } from "./shared/logger";
 
 export type Platform = "linux" | "mac" | "windows";
 export type Architecture = "x64" | "arm64";
