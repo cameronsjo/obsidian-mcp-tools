@@ -22,7 +22,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
  */
 
 export async function makeRequest<
-  T extends Type<{}, {}> | Type<undefined, {}> | Type<{} | undefined, {}>,
+  T extends Type<{}, {}> | Type<null|undefined, {}> | Type<{} | null|undefined, {}>,
 >(schema: T, path: string, init?: RequestInit): Promise<T["infer"]> {
   const API_KEY = process.env.OBSIDIAN_API_KEY;
   if (!API_KEY) {
@@ -53,9 +53,12 @@ export async function makeRequest<
   // 204 No Content responses should be validated as undefined
   const validated = response.status === 204 ? undefined : schema(data);
   if (validated instanceof type.errors) {
+    const stackError = new Error();
+    Error.captureStackTrace(stackError, makeRequest);
     logger.error("Invalid response from Obsidian API", {
       status: response.status,
       error: validated.summary,
+      stack: stackError.stack,
       data,
     });
     throw new McpError(

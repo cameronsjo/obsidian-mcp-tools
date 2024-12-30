@@ -172,6 +172,33 @@ export const ApiVaultFileResponse = type({
 });
 
 /**
+ * Parameters for patching a file or document in the Obsidian plugin's REST API.
+ * This type defines the expected request body for the patch operation.
+ *
+ * @property operation - The type of patch operation to perform, one of 'append', 'prepend', or 'replace'.
+ * @property targetType - The type of target to patch, one of 'heading', 'block', or 'frontmatter'.
+ * @property target - The target string to patch, e.g. the heading or block text.
+ * @property targetDelimiter - An optional delimiter to use when targeting a specific block or heading.
+ * @property trimTargetWhitespace - An optional flag to trim whitespace from the target before patching.
+ * @property content - The content to patch into the target.
+ * @property contentType - The optional content type of the patch content, either 'text/markdown' or 'application/json'.
+ */
+export const ApiPatchParameters = type({
+  operation: "'append' | 'prepend' | 'replace'",
+  targetType: "'heading' | 'block' | 'frontmatter'",
+  target: "string",
+  "targetDelimiter?": "string",
+  "trimTargetWhitespace?": "boolean",
+  content: "string",
+  "contentType?": "'text/markdown' | 'application/json'",
+});
+
+/**
+ * Represents a response containing markdown content
+ */
+export const ApiContentResponse = type("string").describe("Content");
+
+/**
  * Empty response for successful operations that don't return content
  * Content-Type: none (204 No Content)
  * Used by:
@@ -182,7 +209,7 @@ export const ApiVaultFileResponse = type({
  * - DELETE endpoints
  * Returns 204 No Content
  */
-export const ApiNoContentResponse = type("undefined");
+export const ApiNoContentResponse = type("unknown").describe("No Content");
 
 /**
  * Parameters for executing a template

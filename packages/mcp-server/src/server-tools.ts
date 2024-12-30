@@ -14,17 +14,7 @@ import { makeRequest } from "./makeRequest.js";
 import tools from "./registry.js";
 import { formatMcpError } from "./utilities.js";
 import { parseTemplateParameters } from "./parseTemplateParameters.js";
-
-// Define request argument types using ArkType
-const patchOperationType = type({
-  operation: "'append' | 'prepend' | 'replace'",
-  targetType: "'heading' | 'block' | 'frontmatter'",
-  target: "string",
-  "targetDelimiter?": "string",
-  "trimTargetWhitespace?": "boolean",
-  content: "string",
-  "contentType?": "'text/markdown' | 'application/json'",
-});
+import { ApiPatchParameters } from "../../shared/src/types/plugin-local-rest-api.js";
 
 export function setupObsidianTools(server: Server) {
   // Status
@@ -110,7 +100,7 @@ export function setupObsidianTools(server: Server) {
   tools.register(
     type({
       name: '"patch_active_file"',
-      arguments: patchOperationType,
+      arguments: LocalRestAPI.ApiPatchParameters,
     }).describe(
       "Insert or modify content in the currently-open note relative to a heading, block reference, or frontmatter field.",
     ),
@@ -119,6 +109,7 @@ export function setupObsidianTools(server: Server) {
         Operation: args.operation,
         "Target-Type": args.targetType,
         Target: args.target,
+        "Create-Target-If-Missing": "true",
       };
 
       if (args.targetDelimiter) {
@@ -131,13 +122,20 @@ export function setupObsidianTools(server: Server) {
         headers["Content-Type"] = args.contentType;
       }
 
-      await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
-        method: "PATCH",
-        headers,
-        body: args.content,
-      });
+      const response = await makeRequest(
+        LocalRestAPI.ApiContentResponse,
+        "/active/",
+        {
+          method: "PATCH",
+          headers,
+          body: args.content,
+        },
+      );
       return {
-        content: [{ type: "text", text: "File patched successfully" }],
+        content: [
+          { type: "text", text: "File patched successfully" },
+          { type: "text", text: response },
+        ],
       };
     },
   );
@@ -166,7 +164,7 @@ export function setupObsidianTools(server: Server) {
         "newLeaf?": "boolean",
       },
     }).describe(
-      "Open a document in Obsidian. Creates a new document if it doesn't exist.",
+      "Open a document in the Obsidian UI. Creates a new document if it doesn't exist. Returns a confirmation if the file was opened successfully.",
     ),
     async ({ arguments: args }) => {
       const query = args.newLeaf ? "?newLeaf=true" : "";
@@ -389,15 +387,16 @@ export function setupObsidianTools(server: Server) {
       name: '"patch_vault_file"',
       arguments: type({
         filename: "string",
-      }).and(patchOperationType),
+      }).and(ApiPatchParameters),
     }).describe(
       "Insert or modify content in a file relative to a heading, block reference, or frontmatter field.",
     ),
     async ({ arguments: args }) => {
-      const headers: Record<string, string> = {
+      const headers: HeadersInit = {
         Operation: args.operation,
         "Target-Type": args.targetType,
         Target: args.target,
+        "Create-Target-If-Missing": "true",
       };
 
       if (args.targetDelimiter) {
@@ -410,8 +409,8 @@ export function setupObsidianTools(server: Server) {
         headers["Content-Type"] = args.contentType;
       }
 
-      await makeRequest(
-        LocalRestAPI.ApiNoContentResponse,
+      const response = await makeRequest(
+        LocalRestAPI.ApiContentResponse,
         `/vault/${encodeURIComponent(args.filename)}`,
         {
           method: "PATCH",
@@ -419,8 +418,12 @@ export function setupObsidianTools(server: Server) {
           body: args.content,
         },
       );
+
       return {
-        content: [{ type: "text", text: "File patched successfully" }],
+        content: [
+          { type: "text", text: "File patched successfully" },
+          { type: "text", text: response },
+        ],
       };
     },
   );
