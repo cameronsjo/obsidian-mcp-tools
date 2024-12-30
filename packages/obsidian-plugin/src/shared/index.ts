@@ -5,6 +5,7 @@ import {
   map,
   merge,
   scan,
+  startWith,
   takeUntil,
   takeWhile,
   timer,
@@ -109,5 +110,6 @@ export const loadDependencies = (plugin: McpToolsPlugin) => {
       acc[dependency.id] = dependency;
       return acc;
     }, dependencies),
+    startWith(dependencies),
   );
 };

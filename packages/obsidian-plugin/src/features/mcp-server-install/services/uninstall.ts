@@ -1,7 +1,7 @@
 import fsp from "fs/promises";
 import path from "path";
 import { Plugin } from "obsidian";
-import { logger } from "../../../logger";
+import { logger } from "../../../shared/logger";
 import { BINARY_NAME } from "../constants";
 import { getPlatform } from "./download";
 
