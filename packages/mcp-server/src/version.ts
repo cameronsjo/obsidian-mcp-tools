@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 
-export async function getVersion() {
+export function getVersion() {
   try {
     const packageJson = path.resolve(
       import.meta.dir,
