@@ -102,6 +102,28 @@ packages/
 - [bun](https://bun.sh/) v1.0.0 or higher
 - TypeScript 5.0+
 
+## Security
+
+### Binary Verification
+
+The MCP server binaries are published with [GitHub's artifact attestations](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-and-reusable-workflows-to-achieve-slsa-v1-build-level-3), which provide cryptographic proof of where and how the binaries were built. This helps ensure the integrity and provenance of the binaries you download.
+
+To verify a binary:
+
+1. Install the GitHub CLI: https://cli.github.com/
+2. Download the binary from the releases page
+3. Run the verification command:
+   ```bash
+   gh attestation verify PATH/TO/DOWNLOADED/BINARY -R jacksteamdev/obsidian-mcp-tools
+   ```
+
+The command will show you:
+- The GitHub repository that built the binary
+- The workflow that created it
+- The commit SHA and other build details
+
+This verification provides SLSA Level 2 assurance that the binary was built from the source code in this repository using GitHub Actions.
+
 ## License
 
 [MIT License](LICENSE)

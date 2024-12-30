@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       
@@ -26,6 +28,11 @@ jobs:
       - name: Zip Release Artifacts
         run: bun run zip
       
+      - name: Generate artifact attestation for MCP server binaries
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'packages/mcp-server/dist/*'
+
       - name: Upload Release Artifacts
         uses: ncipollo/release-action@v1
         with:
