@@ -1,5 +1,11 @@
 # Obsidian MCP Tools
 
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/jacksteamdev/obsidian-mcp-tools)](https://github.com/jacksteamdev/obsidian-mcp-tools/releases/latest)
+[![Build status](https://img.shields.io/github/actions/workflow/status/jacksteamdev/obsidian-mcp-tools/release.yml)](https://github.com/jacksteamdev/obsidian-mcp-tools/actions)
+[![License](https://img.shields.io/github/license/jacksteamdev/obsidian-mcp-tools)](LICENSE)
+
+[Features](#features) | [Installation](#installation) | [Configuration](#configuration) | [Troubleshooting](#troubleshooting) | [Security](#security) | [Development](#development) | [Support](#support)
+
 Obsidian MCP Tools enhances your Obsidian experience by providing a Model Context Protocol (MCP) server that enables advanced features like semantic search, template execution, and AI-powered tools.
 
 ## Features
@@ -29,6 +35,7 @@ Obsidian MCP Tools enhances your Obsidian experience by providing a Model Contex
 4. Click "Install Server" to download and configure the MCP server
 
 The plugin will:
+
 - Download the appropriate MCP server binary for your platform
 - Configure Claude Desktop to use the server
 - Set up necessary permissions and paths
@@ -43,12 +50,14 @@ The plugin will:
 
 ## Configuration
 
-The plugin automatically:
-1. Uses your Local REST API plugin's API key
-2. Configures Claude Desktop to use the MCP server
-3. Sets up appropriate paths and permissions
+After clicking the "Install Server" button in the plugin settings, the plugin will automatically:
 
-No manual configuration is required beyond installing prerequisites.
+1. Download the appropriate MCP server binary
+2. Use your Local REST API plugin's API key
+3. Configure Claude Desktop to use the MCP server
+4. Set up appropriate paths and permissions
+
+While the configuration process is automated, it requires your explicit permission to install the server binary and modify the Claude Desktop configuration. No additional manual configuration is required beyond this initial setup step.
 
 ## Troubleshooting
 
@@ -58,16 +67,66 @@ If you encounter issues:
    - All required plugins are installed
    - The server is properly installed
    - Claude Desktop is configured
-
 2. Review the logs:
    - Open plugin settings
    - Click "Open Logs" under Resources
    - Look for any error messages or warnings
-
 3. Common Issues:
    - **Server won't start**: Ensure Claude Desktop is running
    - **Connection errors**: Verify Local REST API plugin is configured
    - **Permission errors**: Try reinstalling the server
+
+## Security
+
+### Binary Distribution
+
+- All releases are built using GitHub Actions with reproducible builds
+- Binaries are signed and attested using SLSA provenance
+- Release workflows are fully auditable in the repository
+
+### Runtime Security
+
+- The MCP server runs with minimal required permissions
+- All communication is encrypted
+- API keys are stored securely using platform-specific credential storage
+
+### Binary Verification
+
+The MCP server binaries are published with [SLSA Provenance attestations](https://slsa.dev/provenance/v1), which provide cryptographic proof of where and how the binaries were built. This helps ensure the integrity and provenance of the binaries you download.
+
+To verify a binary using the GitHub CLI:
+
+1. Install GitHub CLI:
+
+   ```bash
+   # macOS (Homebrew)
+   brew install gh
+
+   # Windows (Scoop)
+   scoop install gh
+
+   # Linux
+   sudo apt install gh  # Debian/Ubuntu
+   ```
+
+2. Verify the binary:
+   ```bash
+   gh attestation verify --owner jacksteamdev <binary path or URL>
+   ```
+
+The verification will show:
+
+- The binary's SHA256 hash
+- Confirmation that it was built by this repository's GitHub Actions workflows
+- The specific workflow file and version tag that created it
+- Compliance with SLSA Level 3 build requirements
+
+This verification ensures the binary hasn't been tampered with and was built directly from this repository's source code.
+
+### Reporting Security Issues
+
+Please report security vulnerabilities via our [security policy](SECURITY.md).
+Do not report security vulnerabilities in public issues.
 
 ## Development
 
@@ -86,12 +145,10 @@ packages/
    ```bash
    bun install
    ```
-
 2. Build all packages:
    ```bash
    bun run build
    ```
-
 3. For development:
    ```bash
    bun run dev
@@ -99,30 +156,30 @@ packages/
 
 ### Requirements
 
-- [bun](https://bun.sh/) v1.0.0 or higher
+- [bun](https://bun.sh/) v1.1.42 or higher
 - TypeScript 5.0+
 
-## Security
+## Contributing
 
-### Binary Verification
-
-The MCP server binaries are published with [GitHub's artifact attestations](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-and-reusable-workflows-to-achieve-slsa-v1-build-level-3), which provide cryptographic proof of where and how the binaries were built. This helps ensure the integrity and provenance of the binaries you download.
-
-To verify a binary:
-
-1. Install the GitHub CLI: https://cli.github.com/
-2. Download the binary from the releases page
-3. Run the verification command:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests:
    ```bash
-   gh attestation verify PATH/TO/DOWNLOADED/BINARY -R jacksteamdev/obsidian-mcp-tools
+   bun test
    ```
+5. Submit a pull request
 
-The command will show you:
-- The GitHub repository that built the binary
-- The workflow that created it
-- The commit SHA and other build details
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-This verification provides SLSA Level 2 assurance that the binary was built from the source code in this repository using GitHub Actions.
+## Support
+
+- [Open an issue](https://github.com/jacksteamdev/obsidian-mcp-tools/issues) for bug reports and feature requests
+- [Start a discussion](https://github.com/jacksteamdev/obsidian-mcp-tools/discussions) for questions and general help
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each release.
 
 ## License
 
