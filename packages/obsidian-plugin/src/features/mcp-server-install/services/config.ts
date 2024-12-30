@@ -97,3 +97,39 @@ export async function updateClaudeConfig(
     );
   }
 }
+
+/**
+ * Removes the MCP server entry from the Claude Desktop config file
+ */
+export async function removeFromClaudeConfig(): Promise<void> {
+  try {
+    const configPath = getConfigPath();
+
+    // Read existing config
+    let config: ClaudeConfig;
+    try {
+      const content = await fsp.readFile(configPath, "utf8");
+      config = JSON.parse(content);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        // File doesn't exist, nothing to remove
+        return;
+      }
+      throw error;
+    }
+
+    // Remove our server entry if it exists
+    if (config.mcpServers && "obsidian-mcp-tools" in config.mcpServers) {
+      delete config.mcpServers["obsidian-mcp-tools"];
+      await fsp.writeFile(configPath, JSON.stringify(config, null, 2));
+      logger.info("Removed server from Claude config", { configPath });
+    }
+  } catch (error) {
+    logger.error("Failed to remove from Claude config:", { error });
+    throw new Error(
+      `Failed to remove from Claude config: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}

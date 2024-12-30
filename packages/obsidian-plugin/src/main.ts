@@ -1,7 +1,6 @@
 import { type } from "arktype";
 import type { Request, Response } from "express";
 import { Notice, Plugin, TFile } from "obsidian";
-import { LocalRestApiPublicApi } from "obsidian-local-rest-api";
 import { shake } from "radash";
 import {
   ExecutePromptParamsSchema,
@@ -12,26 +11,31 @@ import {
   type SearchResponse,
 } from "shared";
 import { setup as setupMcpServerInstall } from "./features/mcp-server-install";
-import { logger } from "./shared/logger";
 import {
   loadLocalRestAPI,
   loadSmartSearchAPI,
   loadTemplaterAPI,
-  type Dependency,
+  type Dependencies,
 } from "./shared";
+import { logger } from "./shared/logger";
 
 const isProduction = process.env.NODE_ENV === "production";
 
-import { setup as setupCore } from "./features/core";
 import { lastValueFrom } from "rxjs";
+import { setup as setupCore } from "./features/core";
 
 export default class McpToolsPlugin extends Plugin {
-  private localRestApi: Dependency<LocalRestApiPublicApi> = {
+  private localRestApi: Dependencies["obsidian-local-rest-api"] = {
     id: "obsidian-local-rest-api",
     name: "Local REST API",
     required: true,
     installed: false,
   };
+
+  async getLocalRestApiKey(): Promise<string | undefined> {
+    // The API key is stored in the plugin's settings
+    return this.localRestApi.plugin?.settings?.apiKey;
+  }
 
   async onload() {
     // Initialize features in order

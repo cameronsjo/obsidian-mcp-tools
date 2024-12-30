@@ -88,12 +88,14 @@ async function resolveSymlinks(filepath: string): Promise<string> {
   }
 }
 
-export async function getInstallPath(plugin: Plugin): Promise<{
+export interface InstallPathInfo {
   dir: string;
   path: string;
   name: string;
   symlinked?: string;
-}> {
+}
+
+export async function getInstallPath(plugin: Plugin): Promise<InstallPathInfo> {
   const platform = getPlatform();
   const originalPath = path.join(
     plugin.app.vault.adapter.basePath,

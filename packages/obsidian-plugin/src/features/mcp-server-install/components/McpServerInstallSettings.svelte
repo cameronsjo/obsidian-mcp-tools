@@ -1,21 +1,31 @@
 <script lang="ts">
   import { unlink } from "node:fs/promises";
-  import { normalizePath } from "obsidian";
+  import { normalizePath, Notice } from "obsidian";
   import { getLogDirectory } from "shared";
   import type McpToolsPlugin from "src/main";
   import { loadDependencies } from "src/shared";
   import { onMount } from "svelte";
   import { BINARY_NAME } from "../constants";
   import { getPlatform, installMcpServer } from "../services/download";
+  import {
+    updateClaudeConfig,
+    removeFromClaudeConfig,
+  } from "../services/config";
   import { getInstallationStatus } from "../services/status";
   import type { InstallationStatus } from "../types";
   import { openFolder } from "../utils/openFolder";
 
   export let plugin: McpToolsPlugin;
 
-  // Dependencies
+  // Dependencies and API key status
   const dependencyStore = loadDependencies(plugin);
   let deps = $dependencyStore;
+  let hasApiKey = false;
+
+  onMount(async () => {
+    const apiKey = await plugin.getLocalRestApiKey();
+    hasApiKey = !!apiKey;
+  });
 
   // Installation status
   let status: InstallationStatus = {
@@ -29,14 +39,26 @@
   // Handle installation
   async function handleInstall() {
     try {
+      const apiKey = await plugin.getLocalRestApiKey();
+      if (!apiKey) {
+        throw new Error("Local REST API key is not configured");
+      }
+
       status = { isInstalled: false, isInstalling: true };
-      await installMcpServer(plugin);
+      const installPath = await installMcpServer(plugin);
+
+      // Update Claude config
+      await updateClaudeConfig(plugin, installPath.path, apiKey);
+
       status = await getInstallationStatus(plugin);
     } catch (error) {
       status = {
         isInstalled: false,
         isInstalling: false,
       };
+      new Notice(
+        error instanceof Error ? error.message : "Installation failed"
+      );
     }
   }
 
@@ -44,20 +66,21 @@
   async function handleUninstall() {
     try {
       status = { isInstalled: false, isInstalling: true };
-      // For now, we'll just remove the binary file
       const platform = getPlatform();
-      // TODO: normalizePath omits the starting slash for POSIX, IDK what it does to Windows paths
       const binPath = normalizePath(
         `${plugin.app.vault.adapter.basePath}/${plugin.app.vault.configDir}/plugins/${plugin.manifest.id}/bin/${BINARY_NAME[platform]}`,
       );
       await unlink(binPath);
+      await removeFromClaudeConfig();
       status = { isInstalled: false };
-      // TODO: Remove our app from claude_desktop_config.json
     } catch (error) {
       status = {
         isInstalled: true,
         isInstalling: false,
       };
+      new Notice(
+        error instanceof Error ? error.message : "Uninstallation failed"
+      );
     }
   }
 </script>
@@ -68,7 +91,13 @@
   {#if !status.isInstalled && !status.isInstalling}
     <div class="status-message">
       MCP Server is not installed
-      <button on:click={handleInstall}>Install</button>
+      {#if hasApiKey}
+        <button on:click={handleInstall}>Install</button>
+      {:else}
+        <div class="error-message">
+          Please configure the Local REST API plugin with an API key to enable installation
+        </div>
+      {/if}
     </div>
   {:else if status.isInstalling}
     <div class="status-message">Installing MCP Server...</div>
@@ -80,7 +109,13 @@
   {:else if status.isInstalled && status.updateAvailable}
     <div class="status-message">
       Update available (v{status.version})
-      <button on:click={handleInstall}>Update</button>
+      {#if hasApiKey}
+        <button on:click={handleInstall}>Update</button>
+      {:else}
+        <div class="error-message">
+          Please configure the Local REST API plugin with an API key to enable updates
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

@@ -1,3 +1,4 @@
+import type { App } from "obsidian";
 import { getAPI, LocalRestApiPublicApi } from "obsidian-local-rest-api";
 import {
   distinct,
@@ -13,25 +14,32 @@ import {
 import type { SmartConnections, Templater } from "shared";
 import type McpToolsPlugin from "src/main";
 
-export interface Dependency<API> {
+export interface Dependency<ID extends keyof App["plugins"]["plugins"], API> {
   id: keyof Dependencies;
   name: string;
   required: boolean;
   installed: boolean;
   url?: string;
   api?: API;
+  plugin?: App["plugins"]["plugins"][ID];
 }
 
-interface Dependencies {
-  "obsidian-local-rest-api": Dependency<LocalRestApiPublicApi>;
-  "smart-connections": Dependency<SmartConnections.SmartSearch>;
-  "templater-obsidian": Dependency<Templater.ITemplater>;
+export interface Dependencies {
+  "obsidian-local-rest-api": Dependency<
+    "obsidian-local-rest-api",
+    LocalRestApiPublicApi
+  >;
+  "smart-connections": Dependency<
+    "smart-connections",
+    SmartConnections.SmartSearch
+  >;
+  "templater-obsidian": Dependency<"templater-obsidian", Templater.ITemplater>;
 }
 
 export const loadSmartSearchAPI = (plugin: McpToolsPlugin) =>
   interval(200).pipe(
     takeUntil(timer(5000)),
-    map((): Dependency<SmartConnections.SmartSearch> => {
+    map((): Dependencies["smart-connections"] => {
       const api = typeof SmartSearch === "undefined" ? undefined : SmartSearch;
       return {
         id: "smart-connections",
@@ -39,6 +47,7 @@ export const loadSmartSearchAPI = (plugin: McpToolsPlugin) =>
         required: false,
         installed: !!api,
         api,
+        plugin: plugin.app.plugins.plugins["smart-connections"],
       };
     }),
     takeWhile((dependency) => !dependency.installed, true),
@@ -48,7 +57,7 @@ export const loadSmartSearchAPI = (plugin: McpToolsPlugin) =>
 export const loadLocalRestAPI = (plugin: McpToolsPlugin) =>
   interval(200).pipe(
     takeUntil(timer(5000)),
-    map((): Dependency<LocalRestApiPublicApi> => {
+    map((): Dependencies["obsidian-local-rest-api"] => {
       const api = getAPI(plugin.app, plugin.manifest);
       return {
         id: "obsidian-local-rest-api",
@@ -56,6 +65,7 @@ export const loadLocalRestAPI = (plugin: McpToolsPlugin) =>
         required: true,
         installed: !!api,
         api,
+        plugin: plugin.app.plugins.plugins["obsidian-local-rest-api"],
       };
     }),
     takeWhile((dependency) => !dependency.installed, true),
@@ -65,7 +75,7 @@ export const loadLocalRestAPI = (plugin: McpToolsPlugin) =>
 export const loadTemplaterAPI = (plugin: McpToolsPlugin) =>
   interval(200).pipe(
     takeUntil(timer(5000)),
-    map((): Dependency<Templater.ITemplater> => {
+    map((): Dependencies["templater-obsidian"] => {
       const api = plugin.app.plugins.plugins["templater-obsidian"]?.templater;
       return {
         id: "templater-obsidian",
@@ -73,6 +83,7 @@ export const loadTemplaterAPI = (plugin: McpToolsPlugin) =>
         required: false,
         installed: !!api,
         api,
+        plugin: plugin.app.plugins.plugins["templater-obsidian"],
       };
     }),
     takeWhile((dependency) => !dependency.installed, true),

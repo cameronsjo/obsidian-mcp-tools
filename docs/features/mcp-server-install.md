@@ -115,7 +115,6 @@ The settings UI is implemented as a Svelte component in `components/SettingsTab.
 1. Unified Version Approach:
    - Plugin and server share same version number
    - Version stored in plugin manifest
-   - Server binary named with version (e.g., mcp-server-1.2.3)
    - Server provides version via `--version` flag
    - Version checked during plugin initialization
 

@@ -7,7 +7,7 @@ import { Observable } from "rxjs";
 import { logger } from "../../../shared/logger";
 import { GITHUB_RELEASE_URL, type Arch, type Platform } from "../constants";
 import type { DownloadProgress } from "../types";
-import { getInstallPath } from "./status";
+import { getInstallPath, type InstallPathInfo } from "./status";
 
 export function getPlatform(): Platform {
   const platform = os.platform();
@@ -206,7 +206,9 @@ export function downloadFile(
   });
 }
 
-export async function installMcpServer(plugin: Plugin): Promise<void> {
+export async function installMcpServer(
+  plugin: Plugin,
+): Promise<InstallPathInfo> {
   try {
     const platform = getPlatform();
     const arch = getArch();
@@ -214,11 +216,6 @@ export async function installMcpServer(plugin: Plugin): Promise<void> {
     const installPath = await getInstallPath(plugin);
 
     await ensureDirectory(installPath.dir);
-
-    logger.debug("Downloading MCP server:", {
-      downloadUrl,
-      installPath,
-    });
 
     const progressNotice = new Notice("Downloading MCP server...", 0);
 
@@ -241,7 +238,7 @@ export async function installMcpServer(plugin: Plugin): Promise<void> {
           progressNotice.hide();
           new Notice("MCP server downloaded successfully!");
           logger.info("MCP server downloaded", { installPath });
-          resolve();
+          resolve(installPath);
         },
       });
     });
