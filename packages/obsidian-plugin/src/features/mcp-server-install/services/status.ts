@@ -129,7 +129,9 @@ export async function getInstallationStatus(
 
       // Get installed version
       try {
-        const { stdout } = await execAsync(`"${installPath.path}" --version`);
+        const versionCommand = `"${installPath.path}" --version`;
+        logger.debug("Getting server version:", { versionCommand });
+        const { stdout } = await execAsync(versionCommand);
         const installedVersion = stdout.trim();
         const pluginVersion = plugin.manifest.version;
         logger.debug("Got server version:", {
@@ -140,6 +142,7 @@ export async function getInstallationStatus(
         return {
           isInstalled: true,
           path: installPath.path,
+          dir: installPath.dir,
           version: installedVersion,
           updateAvailable: installedVersion !== pluginVersion,
         };

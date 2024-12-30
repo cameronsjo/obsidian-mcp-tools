@@ -16,14 +16,12 @@
   // Dependencies
   const dependencyStore = loadDependencies(plugin);
   let deps = $dependencyStore;
-  console.log("deps", deps);
 
   // Installation status
   let status: InstallationStatus = {
     isInstalled: false,
     isInstalling: false,
   };
-  $: console.log("status", status);
   onMount(async () => {
     status = await getInstallationStatus(plugin);
   });
@@ -108,7 +106,7 @@
 
   {#if status.path}
     <div class="link-item">
-      <button on:click={() => status.path && openFolder(status.path)}>
+      <button on:click={() => status.dir && openFolder(status.dir)}>
         Open Server Install Folder
       </button>
     </div>

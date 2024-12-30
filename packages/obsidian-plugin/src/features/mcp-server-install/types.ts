@@ -15,6 +15,7 @@ export interface InstallationStatus {
   isInstalled: boolean;
   version?: string;
   path?: string;
+  dir?: string;
   updateAvailable?: boolean;
   isInstalling?: boolean;
 }
