@@ -102,7 +102,7 @@ export const ApiSimpleSearchResponse = type({
   filename: "string",
   matches: ApiSimpleSearchMatch.array(),
   score: "number",
-});
+}).array();
 
 /**
  * Result entry from semantic search
