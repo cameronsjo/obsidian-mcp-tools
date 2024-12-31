@@ -9,9 +9,9 @@ const CallExpressionSchema = type({
     object: {
       type: "'MemberExpression'",
       object: { name: "'tp'" },
-      property: { name: "'user'" },
+      property: { name: "'mcpTools'" },
     },
-    property: { name: "'promptArg'" },
+    property: { name: "'prompt'" },
   },
   arguments: type({ type: "'Literal'", value: "string" }).array(),
 });
@@ -20,7 +20,7 @@ const CallExpressionSchema = type({
  * Parses template arguments from the given content string.
  *
  * The function looks for template argument tags in the content string, which are
- * in the format `<% tp.user.promptArg("name", "description") %>`, and extracts
+ * in the format `<% tp.mcpTools.prompt("name", "description") %>`, and extracts
  * the name and description of each argument. The extracted arguments are
  * returned as an array of `PromptArgument` objects.
  *

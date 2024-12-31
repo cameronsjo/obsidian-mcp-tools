@@ -18,14 +18,15 @@ import {
   PromptFrontmatterSchema,
   type PromptMetadata,
 } from "shared";
-import { VAULT_PROMPTS_PATH } from "./constants";
+
+const PROMPT_DIRNAME = `Prompts`;
 
 export function setupObsidianPrompts(server: Server) {
   server.setRequestHandler(ListPromptsRequestSchema, async () => {
     try {
       const { files } = await makeRequest(
         LocalRestAPI.ApiVaultDirectoryResponse,
-        VAULT_PROMPTS_PATH,
+        `/vault/${PROMPT_DIRNAME}/`,
       );
       const prompts: PromptMetadata[] = (
         await Promise.all(
@@ -36,7 +37,7 @@ export function setupObsidianPrompts(server: Server) {
             // Retrieve frontmatter and content from vault file
             const file = await makeRequest(
               LocalRestAPI.ApiVaultFileResponse,
-              VAULT_PROMPTS_PATH + filename,
+              `/vault/${PROMPT_DIRNAME}/${filename}`,
               {
                 headers: { Accept: LocalRestAPI.MIME_TYPE_OLRAPI_NOTE_JSON },
               },
@@ -68,10 +69,12 @@ export function setupObsidianPrompts(server: Server) {
 
   server.setRequestHandler(GetPromptRequestSchema, async ({ params }) => {
     try {
+      const promptFilePath = `${PROMPT_DIRNAME}/${params.name}`;
+
       // Get prompt content
       const { content: template, frontmatter } = await makeRequest(
         LocalRestAPI.ApiVaultFileResponse,
-        VAULT_PROMPTS_PATH + params.name,
+        `/vault/${promptFilePath}`,
         {
           headers: { Accept: LocalRestAPI.MIME_TYPE_OLRAPI_NOTE_JSON },
         },
@@ -90,7 +93,7 @@ export function setupObsidianPrompts(server: Server) {
 
       const templateExecutionArgs: LocalRestAPI.ApiTemplateExecutionParamsType =
         {
-          name: params.name,
+          name: promptFilePath,
           arguments: templateArgs,
         };
 

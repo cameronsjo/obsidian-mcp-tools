@@ -107,7 +107,7 @@ export default class McpToolsPlugin extends Plugin {
         Templater.RunMode.CreateNewFromTemplate,
       );
 
-      const promptArg: PromptArgAccessor = (argName: string) => {
+      const prompt: PromptArgAccessor = (argName: string) => {
         return params.arguments[argName] ?? "";
       };
 
@@ -116,15 +116,14 @@ export default class McpToolsPlugin extends Plugin {
           templater.functions_generator,
         );
 
-      // Override generate_object to inject promptArg into user functions
+      // Override generate_object to inject arg into user functions
       templater.functions_generator.generate_object = async function (
         config,
         functions_mode,
       ) {
         const functions = await oldGenerateObject(config, functions_mode);
-        const user = functions.user;
-        user.promptArg = promptArg;
-        return { ...functions, user };
+        Object.assign(functions, { mcpTools: { prompt } });
+        return functions;
       };
 
       // Process template with variables

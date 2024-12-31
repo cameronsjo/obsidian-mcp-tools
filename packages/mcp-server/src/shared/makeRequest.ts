@@ -47,7 +47,8 @@ export async function makeRequest<
 
   if (!response.ok) {
     const error = await response.text();
-    throw new McpError(ErrorCode.InternalError, `Obsidian API error: ${error}`);
+    const message = `${init?.method ?? "GET"} ${path} ${response.status}: ${error}`;
+    throw new McpError(ErrorCode.InternalError, message);
   }
 
   const isJSON = !!response.headers.get("Content-Type")?.includes("json");
@@ -65,7 +66,7 @@ export async function makeRequest<
     });
     throw new McpError(
       ErrorCode.InternalError,
-      `Obsidian API error: ${validated.summary}`,
+      `${init?.method ?? "GET"} ${path} ${response.status}: ${validated.summary}`,
     );
   }
 
