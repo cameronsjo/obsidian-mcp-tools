@@ -1,16 +1,7 @@
-import {
-  formatMcpError,
-  makeRequest,
-  parseTemplateParameters,
-  type ToolRegistry,
-} from "$/shared";
+import { makeRequest, type ToolRegistry } from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { type } from "arktype";
-import {
-  buildTemplateArgumentsSchema,
-  ExecutePromptParamsSchema,
-  LocalRestAPI,
-} from "shared";
+import { LocalRestAPI } from "shared";
 
 export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
   // GET Status

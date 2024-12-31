@@ -37,16 +37,6 @@ export const PromptFrontmatterSchema = type({
 });
 export type PromptFrontmatter = typeof PromptFrontmatterSchema.infer;
 
-export const ExecutePromptParamsSchema = type({
-  name: type("string").describe("Name of the prompt file"),
-  arguments: "Record<string, string>",
-  "createFile?": "boolean",
-  "targetPath?": type("string").describe(
-    "Path to save the file; required if createFile is true"
-  ),
-});
-export type ExecutePromptParams = typeof ExecutePromptParamsSchema.infer;
-
 export const PromptValidationErrorSchema = type({
   type: "'MISSING_REQUIRED_ARG'|'INVALID_ARG_VALUE'",
   message: "string",
@@ -61,11 +51,11 @@ export const PromptExecutionResultSchema = type({
 export type PromptExecutionResult = typeof PromptExecutionResultSchema.infer;
 
 export function buildTemplateArgumentsSchema(
-  args: PromptParameter[]
+  args: PromptParameter[],
 ): Type<Record<string, "string" | "string?">, {}> {
   return type(
     Object.fromEntries(
-      args.map((arg) => [arg.name, arg.required ? "string" : "string?"])
-    ) as Record<string, "string" | "string?">
+      args.map((arg) => [arg.name, arg.required ? "string" : "string?"]),
+    ) as Record<string, "string" | "string?">,
   );
 }

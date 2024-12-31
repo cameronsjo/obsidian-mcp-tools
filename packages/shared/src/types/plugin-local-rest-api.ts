@@ -208,25 +208,25 @@ export const ApiVaultFileResponse = type({
  */
 export const ApiPatchParameters = type({
   operation: type("'append' | 'prepend' | 'replace'").describe(
-    "Specifies how to modify the content: append (add after), prepend (add before), or replace existing content"
+    "Specifies how to modify the content: append (add after), prepend (add before), or replace existing content",
   ),
   targetType: type("'heading' | 'block' | 'frontmatter'").describe(
-    "Identifies what to modify: a section under a heading, a referenced block, or a frontmatter field"
+    "Identifies what to modify: a section under a heading, a referenced block, or a frontmatter field",
   ),
   target: type("string").describe(
-    "The identifier - either heading path (e.g. 'Heading 1::Subheading 1:1'), block reference ID, or frontmatter field name"
+    "The identifier - either heading path (e.g. 'Heading 1::Subheading 1:1'), block reference ID, or frontmatter field name",
   ),
   "targetDelimiter?": type("string").describe(
-    "The separator used in heading paths to indicate nesting (default '::')"
+    "The separator used in heading paths to indicate nesting (default '::')",
   ),
   "trimTargetWhitespace?": type("boolean").describe(
-    "Whether to remove whitespace from target identifier before matching (default: false)"
+    "Whether to remove whitespace from target identifier before matching (default: false)",
   ),
   content: type("string").describe(
-    "The actual content to insert, append, or use as replacement"
+    "The actual content to insert, append, or use as replacement",
   ),
   "contentType?": type("'text/markdown' | 'application/json'").describe(
-    "Format of the content - use application/json for structured data like table rows or frontmatter values"
+    "Format of the content - use application/json for structured data like table rows or frontmatter values",
   ),
 });
 
@@ -258,10 +258,14 @@ export const ApiNoContentResponse = type("unknown").describe("No Content");
  * @property targetPath - The path to save the file; required if createFile is true
  */
 export const ApiTemplateExecutionParams = type({
-  name: "string",
+  name: type("string").describe("Name of the prompt file"),
   arguments: "Record<string, string>",
-  createFile: "boolean?",
-  targetPath: "string?",
+  "createFile?": type("string.json.parse")
+    .to("boolean")
+    .describe("Whether to create a new file from the template"),
+  "targetPath?": type("string").describe(
+    "Path to save the file; required if createFile is true",
+  ),
 });
 
 /**

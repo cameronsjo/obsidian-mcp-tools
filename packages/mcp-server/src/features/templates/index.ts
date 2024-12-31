@@ -1,12 +1,17 @@
-import { formatMcpError, makeRequest, parseTemplateParameters, type ToolRegistry } from "$/shared";
+import {
+  formatMcpError,
+  makeRequest,
+  parseTemplateParameters,
+  type ToolRegistry,
+} from "$/shared";
 import { type } from "arktype";
-import { buildTemplateArgumentsSchema, ExecutePromptParamsSchema, LocalRestAPI } from "shared";
+import { buildTemplateArgumentsSchema, LocalRestAPI } from "shared";
 
 export function registerTemplaterTools(tools: ToolRegistry) {
   tools.register(
     type({
       name: '"execute_template"',
-      arguments: ExecutePromptParamsSchema,
+      arguments: LocalRestAPI.ApiTemplateExecutionParams,
     }).describe("Execute a Templater template with the given arguments"),
     async ({ arguments: args }) => {
       // Get prompt content
@@ -27,10 +32,11 @@ export function registerTemplaterTools(tools: ToolRegistry) {
         throw formatMcpError(validArgs);
       }
 
-      const templateExecutionArgs: LocalRestAPI.ApiTemplateExecutionParamsType = {
-        name: args.name,
-        arguments: validArgs,
-      };
+      const templateExecutionArgs: LocalRestAPI.ApiTemplateExecutionParamsType =
+        {
+          name: args.name,
+          arguments: validArgs,
+        };
 
       // Process template through Templater plugin
       const response = await makeRequest(

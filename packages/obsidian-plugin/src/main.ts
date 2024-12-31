@@ -3,8 +3,8 @@ import type { Request, Response } from "express";
 import { Notice, Plugin, TFile } from "obsidian";
 import { shake } from "radash";
 import {
-  ExecutePromptParamsSchema,
   jsonSearchRequest,
+  LocalRestAPI,
   searchParameters,
   Templater,
   type PromptArgAccessor,
@@ -78,7 +78,7 @@ export default class McpToolsPlugin extends Plugin {
       }
 
       // Validate request body
-      const params = ExecutePromptParamsSchema(req.body);
+      const params = LocalRestAPI.ApiTemplateExecutionParams(req.body);
       if (params instanceof type.errors) {
         const meta = { body: req.body, summary: params.summary };
         logger.error("Invalid request body", meta);
