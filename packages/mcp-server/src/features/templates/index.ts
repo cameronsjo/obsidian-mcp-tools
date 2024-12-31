@@ -11,13 +11,18 @@ export function registerTemplaterTools(tools: ToolRegistry) {
   tools.register(
     type({
       name: '"execute_template"',
-      arguments: LocalRestAPI.ApiTemplateExecutionParams,
+      arguments: LocalRestAPI.ApiTemplateExecutionParams.omit("createFile").and(
+        {
+          // should be boolean but the MCP client returns a string
+          "createFile?": type("'true'|'false'"),
+        },
+      ),
     }).describe("Execute a Templater template with the given arguments"),
     async ({ arguments: args }) => {
       // Get prompt content
       const data = await makeRequest(
         LocalRestAPI.ApiVaultFileResponse,
-        `/vault/Prompts/${args.name}.md`,
+        `/vault/${args.name}`,
         {
           headers: { Accept: LocalRestAPI.MIME_TYPE_OLRAPI_NOTE_JSON },
         },
@@ -32,11 +37,17 @@ export function registerTemplaterTools(tools: ToolRegistry) {
         throw formatMcpError(validArgs);
       }
 
-      const templateExecutionArgs: LocalRestAPI.ApiTemplateExecutionParamsType =
-        {
-          name: args.name,
-          arguments: validArgs,
-        };
+      const templateExecutionArgs: {
+        name: string;
+        arguments: Record<string, string>;
+        createFile: boolean;
+        targetPath?: string;
+      } = {
+        name: args.name,
+        arguments: validArgs,
+        createFile: args.createFile === "true",
+        targetPath: args.targetPath,
+      };
 
       // Process template through Templater plugin
       const response = await makeRequest(

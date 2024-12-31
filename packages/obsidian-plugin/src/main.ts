@@ -2,6 +2,7 @@ import { type } from "arktype";
 import type { Request, Response } from "express";
 import { Notice, Plugin, TFile } from "obsidian";
 import { shake } from "radash";
+import { lastValueFrom } from "rxjs";
 import {
   jsonSearchRequest,
   LocalRestAPI,
@@ -10,6 +11,7 @@ import {
   type PromptArgAccessor,
   type SearchResponse,
 } from "shared";
+import { setup as setupCore } from "./features/core";
 import { setup as setupMcpServerInstall } from "./features/mcp-server-install";
 import {
   loadLocalRestAPI,
@@ -18,11 +20,6 @@ import {
   type Dependencies,
 } from "./shared";
 import { logger } from "./shared/logger";
-
-const isProduction = process.env.NODE_ENV === "production";
-
-import { lastValueFrom } from "rxjs";
-import { setup as setupCore } from "./features/core";
 
 export default class McpToolsPlugin extends Plugin {
   private localRestApi: Dependencies["obsidian-local-rest-api"] = {
@@ -67,7 +64,7 @@ export default class McpToolsPlugin extends Plugin {
       const { api: templater } = await lastValueFrom(loadTemplaterAPI(this));
       if (!templater) {
         new Notice(
-          `${this.manifest.name}: Templater plugin is not available. MCP prompts are disabled.`,
+          `${this.manifest.name}: Templater plugin is not available. Please install it from the community plugins.`,
           0,
         );
         logger.error("Templater plugin is not available");
@@ -79,28 +76,27 @@ export default class McpToolsPlugin extends Plugin {
 
       // Validate request body
       const params = LocalRestAPI.ApiTemplateExecutionParams(req.body);
+
       if (params instanceof type.errors) {
-        const meta = { body: req.body, summary: params.summary };
-        logger.error("Invalid request body", meta);
-        res.status(400).json({
+        const response = {
           error: "Invalid request body",
-          // Don't respond with request body in production
-          ...(isProduction ? {} : meta),
-        });
+          body: req.body,
+          summary: params.summary,
+        };
+        logger.debug("Invalid request body", response);
+        res.status(400).json(response);
         return;
       }
 
       // Get prompt content from vault
-      const templatePath = `Prompts/${params.name}`;
-      const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+      const templateFile = this.app.vault.getAbstractFileByPath(params.name);
       if (!(templateFile instanceof TFile)) {
         logger.debug("Template file not found", {
           params,
           templateFile,
-          templatePath,
         });
         res.status(404).json({
-          error: `File not found: ${templatePath}`,
+          error: `File not found: ${params.name}`,
         });
         return;
       }

@@ -258,11 +258,11 @@ export const ApiNoContentResponse = type("unknown").describe("No Content");
  * @property targetPath - The path to save the file; required if createFile is true
  */
 export const ApiTemplateExecutionParams = type({
-  name: type("string").describe("Name of the prompt file"),
+  name: type("string").describe("The full vault path to the template file"),
   arguments: "Record<string, string>",
-  "createFile?": type("string.json.parse")
-    .to("boolean")
-    .describe("Whether to create a new file from the template"),
+  "createFile?": type("boolean").describe(
+    "Whether to create a new file from the template",
+  ),
   "targetPath?": type("string").describe(
     "Path to save the file; required if createFile is true",
   ),
