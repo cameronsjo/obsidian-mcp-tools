@@ -18,7 +18,7 @@ Obsidian MCP Tools enhances your Obsidian experience by providing a Model Contex
 
 ### Required
 
-- [Obsidian](https://obsidian.md/) v1.0.0 or higher
+- [Obsidian](https://obsidian.md/) v1.7.7 or higher
 - [Claude Desktop](https://claude.ai/desktop) installed and configured
 - [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin installed and configured with an API key
 
