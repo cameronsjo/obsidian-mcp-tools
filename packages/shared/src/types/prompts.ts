@@ -9,7 +9,7 @@ import { Type, type } from "arktype";
  *
  * @example
  * ```markdown
- * <% tp.user.promptArg("argName", "Argument description") %>
+ * <% tp.mcpTools.prompt("argName", "Argument description") %>
  * ```
  */
 export interface PromptArgAccessor {
