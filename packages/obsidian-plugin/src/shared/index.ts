@@ -124,3 +124,5 @@ export const loadDependencies = (plugin: McpToolsPlugin) => {
     startWith(dependencies),
   );
 };
+
+export * from "./logger";

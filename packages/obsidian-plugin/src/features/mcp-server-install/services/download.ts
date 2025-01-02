@@ -4,8 +4,8 @@ import https from "https";
 import { Notice, Plugin } from "obsidian";
 import os from "os";
 import { Observable } from "rxjs";
-import { logger } from "../../../shared/logger";
-import { GITHUB_RELEASE_URL, type Arch, type Platform } from "../constants";
+import { logger } from "$/shared";
+import { GITHUB_DOWNLOAD_URL, type Arch, type Platform } from "../constants";
 import type { DownloadProgress } from "../types";
 import { getInstallPath, type InstallPathInfo } from "./status";
 
@@ -26,7 +26,7 @@ export function getArch(): Arch {
 }
 
 export function getDownloadUrl(platform: Platform, arch: Arch): string {
-  return `${GITHUB_RELEASE_URL}/mcp-server-${platform}-${arch}`;
+  return `${GITHUB_DOWNLOAD_URL}/mcp-server-${platform}-${arch}`;
 }
 
 /**
