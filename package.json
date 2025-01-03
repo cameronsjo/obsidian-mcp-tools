@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "check": "bun --filter '*' check",
     "version": "bun scripts/version.ts",
     "release": "bun --filter '*' release",
     "zip": "bun --filter '*' zip"

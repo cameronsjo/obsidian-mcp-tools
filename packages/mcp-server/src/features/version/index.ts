@@ -1,4 +1,4 @@
-import { version } from "../../../../obsidian-plugin/package.json" with { type: "json" };
+import { version } from "../../../../../package.json" with { type: "json" };
 
 export function getVersion() {
   return version;

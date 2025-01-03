@@ -6,8 +6,8 @@ import os from "os";
 import { Observable } from "rxjs";
 import { logger } from "$/shared";
 import { GITHUB_DOWNLOAD_URL, type Arch, type Platform } from "../constants";
-import type { DownloadProgress } from "../types";
-import { getInstallPath, type InstallPathInfo } from "./status";
+import type { DownloadProgress, InstallPathInfo } from "../types";
+import { getInstallPath } from "./status";
 
 export function getPlatform(): Platform {
   const platform = os.platform();
