@@ -5,7 +5,7 @@
   "minAppVersion": "0.15.0",
   "description": "Chat with your notes in Claude Desktop and other Model Context Protocol (MCP) Clients.",
   "author": "Jack Steam",
-  "authorUrl": "https://github.com/jacksteamdev/obsidian-mcp-tools",
+  "authorUrl": "https://github.com/jacksteamdev",
   "fundingUrl": "https://github.com/sponsors/jacksteamdev",
   "isDesktopOnly": true
 }
