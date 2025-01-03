@@ -1,11 +1,13 @@
-import { Plugin } from "obsidian";
-import fsp from "fs/promises";
-import path from "path";
+import type McpToolsPlugin from "$/main";
+import { logger } from "$/shared/logger";
 import { exec } from "child_process";
+import fsp from "fs/promises";
+import { Plugin } from "obsidian";
+import path from "path";
+import { clean, lt, valid } from "semver";
 import { promisify } from "util";
-import type { InstallationStatus } from "../types";
-import { logger } from "../../../shared/logger";
 import { BINARY_NAME } from "../constants";
+import type { InstallationStatus, InstallPathInfo } from "../types";
 import { getPlatform } from "./download";
 
 const execAsync = promisify(exec);
@@ -88,13 +90,6 @@ async function resolveSymlinks(filepath: string): Promise<string> {
   }
 }
 
-export interface InstallPathInfo {
-  dir: string;
-  path: string;
-  name: string;
-  symlinked?: string;
-}
-
 export async function getInstallPath(plugin: Plugin): Promise<InstallPathInfo> {
   const platform = getPlatform();
   const originalPath = path.join(
@@ -104,14 +99,14 @@ export async function getInstallPath(plugin: Plugin): Promise<InstallPathInfo> {
     plugin.manifest.id,
     "bin",
   );
-  const realpath = await resolveSymlinks(originalPath);
-  const filename = BINARY_NAME[platform];
-  const filepath = path.join(realpath, filename);
+  const realDirPath = await resolveSymlinks(originalPath);
+  const platformSpecificBinary = BINARY_NAME[platform];
+  const realFilePath = path.join(realDirPath, platformSpecificBinary);
   return {
-    dir: realpath,
-    path: filepath,
-    name: filename,
-    symlinked: originalPath === realpath ? undefined : originalPath,
+    dir: realDirPath,
+    path: realFilePath,
+    name: platformSpecificBinary,
+    symlinked: originalPath === realDirPath ? undefined : originalPath,
   };
 }
 
@@ -119,58 +114,56 @@ export async function getInstallPath(plugin: Plugin): Promise<InstallPathInfo> {
  * Gets the current installation status of the MCP server
  */
 export async function getInstallationStatus(
-  plugin: Plugin,
+  plugin: McpToolsPlugin,
 ): Promise<InstallationStatus> {
-  try {
-    const installPath = await getInstallPath(plugin);
-    logger.debug("Checking installation status:", { installPath });
-
-    try {
-      await fsp.access(installPath.path, fsp.constants.X_OK);
-      logger.debug("Server binary found:", { installPath });
-
-      // Get installed version
-      try {
-        const versionCommand = `"${installPath.path}" --version`;
-        logger.debug("Getting server version:", { versionCommand });
-        const { stdout } = await execAsync(versionCommand);
-        const installedVersion = stdout.trim();
-        const pluginVersion = plugin.manifest.version;
-        logger.debug("Got server version:", {
-          installedVersion,
-          pluginVersion,
-        });
-
-        return {
-          isInstalled: true,
-          path: installPath.path,
-          dir: installPath.dir,
-          version: installedVersion,
-          updateAvailable: installedVersion !== pluginVersion,
-        };
-      } catch (error) {
-        logger.error("Failed to get server version:", { error });
-        return { isInstalled: true, path: installPath.path };
-      }
-    } catch (error) {
-      logger.debug("Server binary not found:", {
-        installPath,
-        error: error instanceof Error ? error.message : error,
-      });
-      return { isInstalled: false };
-    }
-  } catch (error) {
-    logger.error("Failed to check installation status:", { error });
-    return { isInstalled: false };
+  // Verify plugin version is valid
+  const pluginVersion = valid(clean(plugin.manifest.version));
+  if (!pluginVersion) {
+    logger.error("Invalid plugin version:", { plugin });
+    return { state: "error", versions: {} };
   }
-}
 
-/**
- * Checks if the Local REST API plugin is installed and configured
- */
-export function isLocalRestApiConfigured(plugin: Plugin): boolean {
-  return (
-    plugin.app.plugins.plugins["obsidian-local-rest-api"]?.settings?.apiKey !=
-    null
-  );
+  // Check for API key
+  const apiKey = plugin.getLocalRestApiKey();
+  if (!apiKey) {
+    return {
+      state: "no api key",
+      versions: { plugin: pluginVersion },
+    };
+  }
+
+  // Verify server binary is present
+  const installPath = await getInstallPath(plugin);
+  try {
+    await fsp.access(installPath.path, fsp.constants.X_OK);
+  } catch (error) {
+    logger.error("Failed to get server version:", { installPath });
+    return {
+      state: "not installed",
+      ...installPath,
+      versions: { plugin: pluginVersion },
+    };
+  }
+
+  // Check server binary version
+  let serverVersion: string | null | undefined;
+  try {
+    const versionCommand = `"${installPath.path}" --version`;
+    const { stdout } = await execAsync(versionCommand);
+    serverVersion = clean(stdout.trim());
+    if (!serverVersion) throw new Error("Invalid server version string");
+  } catch {
+    logger.error("Failed to get server version:", { installPath });
+    return {
+      state: "error",
+      ...installPath,
+      versions: { plugin: pluginVersion },
+    };
+  }
+
+  return {
+    ...installPath,
+    state: lt(serverVersion, pluginVersion) ? "outdated" : "installed",
+    versions: { plugin: pluginVersion, server: serverVersion },
+  };
 }

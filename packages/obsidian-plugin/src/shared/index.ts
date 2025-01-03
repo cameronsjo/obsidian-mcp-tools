@@ -97,18 +97,21 @@ export const loadDependencies = (plugin: McpToolsPlugin) => {
       name: "Local REST API",
       required: true,
       installed: false,
+      url: "https://github.com/coddingtonbear/obsidian-local-rest-api",
     },
     "smart-connections": {
       id: "smart-connections",
       name: "Smart Connections",
       required: false,
       installed: false,
+      url: "https://smartconnections.app/",
     },
     "templater-obsidian": {
       id: "templater-obsidian",
       name: "Templater",
       required: false,
       installed: false,
+      url: "https://silentvoid13.github.io/Templater/",
     },
   };
   return merge(
@@ -118,11 +121,19 @@ export const loadDependencies = (plugin: McpToolsPlugin) => {
   ).pipe(
     scan((acc, dependency) => {
       // @ts-expect-error Dynamic key assignment
-      acc[dependency.id] = dependency;
+      acc[dependency.id] = {
+        ...dependencies[dependency.id],
+        ...dependency,
+      };
       return acc;
     }, dependencies),
     startWith(dependencies),
   );
 };
+
+export const loadDependenciesArray = (plugin: McpToolsPlugin) =>
+  loadDependencies(plugin).pipe(
+    map((deps) => Object.values(deps) as Dependencies[keyof Dependencies][]),
+  );
 
 export * from "./logger";

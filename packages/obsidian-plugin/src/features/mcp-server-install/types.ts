@@ -12,12 +12,32 @@ export interface DownloadProgress {
 }
 
 export interface InstallationStatus {
-  isInstalled: boolean;
-  version?: string;
-  path?: string;
+  state:
+    | "no api key"
+    | "not installed"
+    | "installed"
+    | "installing"
+    | "outdated"
+    | "uninstalling"
+    | "error";
+  error?: string;
   dir?: string;
-  updateAvailable?: boolean;
-  isInstalling?: boolean;
+  path?: string;
+  versions: {
+    plugin?: string;
+    server?: string;
+  };
+}
+
+export interface InstallPathInfo {
+  /** The install directory path with all symlinks resolved */
+  dir: string;
+  /** The install filepath with all symlinks resolved */
+  path: string;
+  /** The platform-specific filename */
+  name: string;
+  /** The symlinked install path, if symlinks were found */
+  symlinked?: string;
 }
 
 // Augment Obsidian's App type to include plugins

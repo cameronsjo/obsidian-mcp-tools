@@ -1,6 +1,5 @@
 {
 	"name": "@obsidian-mcp-tools/obsidian-plugin",
-	"version": "0.2.0",
 	"description": "Chat with your Obsidian notes in Claude Desktop and other MCP Clients. Requires obsidian-local-rest-api and smart-connections plugins.",
 	"keywords": [
 		"MCP",
@@ -28,6 +27,7 @@
 		"obsidian-local-rest-api": "^2.5.4",
 		"radash": "^12.1.0",
 		"rxjs": "^7.8.1",
+		"semver": "^7.6.3",
 		"shared": "workspace:*",
 		"svelte": "^5.16.0"
 	},
