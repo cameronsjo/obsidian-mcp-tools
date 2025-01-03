@@ -69,7 +69,7 @@ jobs:
           allowUpdates: true
           omitName: true
           tag: ${{ github.ref_name }}
-          artifacts: "packages/obsidian-plugin/releases/obsidian-plugin-*.zip,packages/obsidian-plugin/main.js,packages/obsidian-plugin/manifest.json,packages/obsidian-plugin/styles.css,packages/mcp-server/dist/*"
+          artifacts: "packages/obsidian-plugin/releases/obsidian-plugin-*.zip,main.js,manifest.json,styles.css,packages/mcp-server/dist/*"
           body: |
             ${{ steps.get_release_body.outputs.result }}
 
