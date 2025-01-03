@@ -80,7 +80,7 @@
   {:else if status.state === "not installed"}
     <div class="status-message">
       MCP Server is not installed
-      <button on:click={handleInstall}>Install</button>
+      <button on:click={handleInstall}>Install Server</button>
     </div>
   {:else if status.state === "installing"}
     <div class="status-message">Installing MCP Server...</div>
