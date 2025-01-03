@@ -40,23 +40,28 @@ export default class McpToolsPlugin extends Plugin {
     await setupMcpServerInstall(this);
 
     // Check for required dependencies
-    this.localRestApi = await lastValueFrom(loadLocalRestAPI(this));
-    if (!this.localRestApi.api) {
-      new Notice(
-        `${this.manifest.name}: Local REST API plugin is required but not found. Please install it from the community plugins and restart Obsidian.`,
-        0,
-      );
-      return;
-    }
+    lastValueFrom(loadLocalRestAPI(this)).then((localRestApi) => {
+      this.localRestApi = localRestApi;
 
-    // Register endpoints
-    this.localRestApi.api
-      .addRoute("/search/smart")
-      .post(this.handleSearchRequest.bind(this));
+      if (!this.localRestApi.api) {
+        new Notice(
+          `${this.manifest.name}: Local REST API plugin is required but not found. Please install it from the community plugins and restart Obsidian.`,
+          0,
+        );
+        return;
+      }
 
-    this.localRestApi.api
-      .addRoute("/templates/execute")
-      .post(this.handleTemplateExecution.bind(this));
+      // Register endpoints
+      this.localRestApi.api
+        .addRoute("/search/smart")
+        .post(this.handleSearchRequest.bind(this));
+
+      this.localRestApi.api
+        .addRoute("/templates/execute")
+        .post(this.handleTemplateExecution.bind(this));
+
+      logger.info("MCP Tools Plugin loaded");
+    });
   }
 
   private async handleTemplateExecution(req: Request, res: Response) {
