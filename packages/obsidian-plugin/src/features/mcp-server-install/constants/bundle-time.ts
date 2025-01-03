@@ -14,7 +14,10 @@ const envVar = type({
  */
 export function environmentVariables() {
   try {
-    const { GITHUB_DOWNLOAD_URL, GITHUB_REF_NAME } = envVar.assert(process.env);
+    const { GITHUB_DOWNLOAD_URL, GITHUB_REF_NAME } = envVar.assert({
+      GITHUB_DOWNLOAD_URL: process.env.GITHUB_DOWNLOAD_URL,
+      GITHUB_REF_NAME: process.env.GITHUB_REF_NAME,
+    });
     return { GITHUB_DOWNLOAD_URL, GITHUB_REF_NAME };
   } catch (error) {
     console.error(`Failed to get environment variables:`, { error });

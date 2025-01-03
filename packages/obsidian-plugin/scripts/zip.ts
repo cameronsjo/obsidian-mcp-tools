@@ -2,7 +2,7 @@ import { create } from "archiver";
 import { createWriteStream } from "fs";
 import fs from "fs-extra";
 import { join, resolve } from "path";
-import { version } from "../package.json" with { type: "json" };
+import { version } from "../../../package.json" with { type: "json" };
 
 async function zipPlugin() {
   const pluginDir = resolve(import.meta.dir, "..");
