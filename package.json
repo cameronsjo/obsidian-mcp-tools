@@ -1,6 +1,6 @@
 {
   "name": "obsidian-mcp-tools",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "private": true,
   "description": "A collection of Model Context Protocol (MCP) tools for Obsidian.md",
   "workspaces": [
