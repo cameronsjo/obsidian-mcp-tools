@@ -4,7 +4,7 @@ import { clean } from "semver";
 const envVar = type({
   GITHUB_DOWNLOAD_URL: "string.url",
   GITHUB_REF_NAME: type("string")
-    .pipe((ref) => clean(ref))
+    .pipe((ref) => clean(ref)?.toString())
     .to("string.semver"),
 });
 
