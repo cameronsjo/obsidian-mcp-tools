@@ -16,12 +16,6 @@ export const { filename: FULL_LOGGER_FILENAME } =
   loggerConfigMorph.assert(LOGGER_CONFIG);
 
 /**
- * In production, the logger is replaced with Console methods, so that the
- * logs are not written to a file.
- *
- * Creates a logger instance with the specified configuration.
- * The logger is configured to use the "Claude" app name,
- * "obsidian-plugin.log" as the log file name, and the log level is set
- * to "DEBUG" in development and "INFO" in production environments.
+ * In production, we use the console. During development, the logger writes logs to a file.
  */
 export const logger = isProd ? console : createLogger(LOGGER_CONFIG);
