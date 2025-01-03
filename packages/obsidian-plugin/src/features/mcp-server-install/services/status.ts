@@ -8,7 +8,7 @@ import { clean, lt, valid } from "semver";
 import { promisify } from "util";
 import { BINARY_NAME } from "../constants";
 import type { InstallationStatus, InstallPathInfo } from "../types";
-import { getPlatform } from "./download";
+import { getPlatform } from "./install";
 
 const execAsync = promisify(exec);
 
