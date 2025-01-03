@@ -1,36 +1,29 @@
 <script lang="ts">
-  import { unlink } from "node:fs/promises";
-  import { normalizePath, Notice } from "obsidian";
+  import { Notice } from "obsidian";
   import { getLogDirectory } from "shared";
   import type McpToolsPlugin from "src/main";
-  import { loadDependencies } from "src/shared";
+  import { loadDependenciesArray } from "src/shared";
   import { onMount } from "svelte";
-  import { BINARY_NAME } from "../constants";
-  import { getPlatform, installMcpServer } from "../services/download";
   import {
-    updateClaudeConfig,
     removeFromClaudeConfig,
+    updateClaudeConfig,
   } from "../services/config";
+  import { installMcpServer } from "../services/download";
   import { getInstallationStatus } from "../services/status";
+  import { uninstallServer } from "../services/uninstall";
   import type { InstallationStatus } from "../types";
   import { openFolder } from "../utils/openFolder";
 
   export let plugin: McpToolsPlugin;
+  console.log("plugin", plugin);
 
   // Dependencies and API key status
-  const dependencyStore = loadDependencies(plugin);
-  let deps = $dependencyStore;
-  let hasApiKey = false;
-
-  onMount(async () => {
-    const apiKey = await plugin.getLocalRestApiKey();
-    hasApiKey = !!apiKey;
-  });
+  const deps = loadDependenciesArray(plugin);
 
   // Installation status
   let status: InstallationStatus = {
-    isInstalled: false,
-    isInstalling: false,
+    state: "not installed",
+    versions: {},
   };
   onMount(async () => {
     status = await getInstallationStatus(plugin);
@@ -44,7 +37,7 @@
         throw new Error("Local REST API key is not configured");
       }
 
-      status = { isInstalled: false, isInstalling: true };
+      status = { ...status, state: "installing" };
       const installPath = await installMcpServer(plugin);
 
       // Update Claude config
@@ -52,35 +45,29 @@
 
       status = await getInstallationStatus(plugin);
     } catch (error) {
-      status = {
-        isInstalled: false,
-        isInstalling: false,
-      };
-      new Notice(
-        error instanceof Error ? error.message : "Installation failed"
-      );
+      const message =
+        error instanceof Error ? error.message : "Installation failed";
+      status = { ...status, state: "error", error: message };
+      new Notice(message);
     }
   }
 
   // Handle uninstall
   async function handleUninstall() {
     try {
-      status = { isInstalled: false, isInstalling: true };
-      const platform = getPlatform();
-      const binPath = normalizePath(
-        `${plugin.app.vault.adapter.basePath}/${plugin.app.vault.configDir}/plugins/${plugin.manifest.id}/bin/${BINARY_NAME[platform]}`,
-      );
-      await unlink(binPath);
+      status = { ...status, state: "installing" };
+      await uninstallServer(plugin);
       await removeFromClaudeConfig();
-      status = { isInstalled: false };
+      status = { ...status, state: "not installed" };
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Uninstallation failed";
       status = {
-        isInstalled: true,
-        isInstalling: false,
+        ...status,
+        state: "error",
+        error: message,
       };
-      new Notice(
-        error instanceof Error ? error.message : "Uninstallation failed"
-      );
+      new Notice(message);
     }
   }
 </script>
@@ -88,49 +75,44 @@
 <div class="installation-status">
   <h3>Installation Status</h3>
 
-  {#if !status.isInstalled && !status.isInstalling}
+  {#if status.state === "no api key"}
+    <div class="error-message">Please configure the Local REST API plugin</div>
+  {:else if status.state === "not installed"}
     <div class="status-message">
       MCP Server is not installed
-      {#if hasApiKey}
-        <button on:click={handleInstall}>Install</button>
-      {:else}
-        <div class="error-message">
-          Please configure the Local REST API plugin with an API key to enable installation
-        </div>
-      {/if}
+      <button on:click={handleInstall}>Install</button>
     </div>
-  {:else if status.isInstalling}
+  {:else if status.state === "installing"}
     <div class="status-message">Installing MCP Server...</div>
-  {:else if status.isInstalled && !status.updateAvailable}
+  {:else if status.state === "installed"}
     <div class="status-message">
-      MCP Server v{status.version} is installed
+      MCP Server v{status.versions.server} is installed
       <button on:click={handleUninstall}>Uninstall</button>
     </div>
-  {:else if status.isInstalled && status.updateAvailable}
+  {:else if status.state === "outdated"}
     <div class="status-message">
-      Update available (v{status.version})
-      {#if hasApiKey}
-        <button on:click={handleInstall}>Update</button>
-      {:else}
-        <div class="error-message">
-          Please configure the Local REST API plugin with an API key to enable updates
-        </div>
-      {/if}
+      Update available (v{status.versions.server} -> v{status.versions.plugin})
+      <button on:click={handleInstall}>Update</button>
     </div>
+  {:else if status.state === "uninstalling"}
+    <div class="status-message">Uninstalling MCP Server...</div>
+  {:else if status.state === "error"}
+    <div class="error-message">{status.error}</div>
   {/if}
 </div>
 
 <div class="dependencies">
   <h3>Dependencies</h3>
 
-  {#each Object.entries(deps) as [id, dep] (id)}
+  {#each $deps as dep (dep.id)}
     <div class="dependency-item">
-      <span class={dep.installed ? "installed" : "not-installed"}>
+      {#if dep.installed}
+        ✅ {dep.name} (Installed)
+      {:else}
+        ❌
         {dep.name}
         {dep.required ? "(Required)" : "(Optional)"}
-      </span>
-      {#if !dep.installed && dep.url}
-        <a href={dep.url} target="_blank">Install</a>
+        {#if dep.url}<a href={dep.url} target="_blank">How to install?</a>{/if}
       {/if}
     </div>
   {/each}
@@ -141,16 +123,18 @@
 
   {#if status.path}
     <div class="link-item">
-      <button on:click={() => status.dir && openFolder(status.dir)}>
-        Open Server Install Folder
-      </button>
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <a on:click={() => status.dir && openFolder(status.dir)}>
+        Server Install Folder
+      </a>
     </div>
   {/if}
 
   <div class="link-item">
-    <button on:click={() => openFolder(getLogDirectory(plugin.manifest.id))}>
-      Open Log Folder
-    </button>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <a on:click={() => openFolder(getLogDirectory(plugin.manifest.id))}>
+      Server Log Folder
+    </a>
   </div>
 
   <div class="link-item">
