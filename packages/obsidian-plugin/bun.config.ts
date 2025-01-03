@@ -42,7 +42,7 @@ const sveltePlugin: BunPlugin = {
 
 const config: BuildConfig = {
 	entrypoints: ["./src/main.ts"],
-	outdir: "./",
+	outdir: "../..",
 	minify: isProd,
 	plugins: [sveltePlugin],
 	external: [

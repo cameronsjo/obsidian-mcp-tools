@@ -18,7 +18,7 @@ json.version = bump([major, minor, patch], semverPart);
 await Bun.write("./package.json", JSON.stringify(json, null, 2) + "\n");
 
 // Update manifest.json with new version and get minAppVersion
-const pluginManifestPath = "./packages/obsidian-plugin/manifest.json";
+const pluginManifestPath = "./manifest.json";
 const pluginManifest = await Bun.file(pluginManifestPath).json();
 const { minAppVersion } = pluginManifest;
 pluginManifest.version = json.version;
@@ -28,7 +28,7 @@ await Bun.write(
 );
 
 // Update versions.json with target version and minAppVersion from manifest.json
-const pluginVersionsPath = "./packages/obsidian-plugin/versions.json";
+const pluginVersionsPath = "./versions.json";
 let versions = JSON.parse(readFileSync(pluginVersionsPath, "utf8"));
 versions[json.version] = minAppVersion;
 writeFileSync(pluginVersionsPath, JSON.stringify(versions, null, "\t") + "\n");

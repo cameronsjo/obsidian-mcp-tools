@@ -15,7 +15,6 @@
 		"check": "tsc --noEmit",
 		"dev": "bun --watch run bun.config.ts --watch",
 		"link": "bun scripts/link.ts",
-		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"release": "run-s build zip",
 		"zip": "bun scripts/zip.ts"
 	},

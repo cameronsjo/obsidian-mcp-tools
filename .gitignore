@@ -176,3 +176,5 @@ dist
 
 # Scratch pad
 playground/
+main.js
+bin/
