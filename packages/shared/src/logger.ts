@@ -2,7 +2,7 @@ import { type } from "arktype";
 import { existsSync, mkdirSync } from "fs";
 import { appendFile } from "fs/promises";
 import { homedir, platform } from "os";
-import { join, resolve } from "path";
+import { dirname, resolve } from "path";
 
 /**
  * Determines the appropriate log directory path based on the current operating system.
@@ -10,16 +10,16 @@ import { join, resolve } from "path";
  * @returns The full path to the log directory for the current operating system.
  * @throws {Error} If the current operating system is not supported.
  */
-export function getLogDirectory(appName: string) {
+export function getLogFilePath(appName: string, fileName: string) {
   switch (platform()) {
     case "darwin": // macOS
-      return join(homedir(), "Library", "Logs", appName);
+      return resolve(homedir(), "Library", "Logs", appName, fileName);
 
     case "win32": // Windows
-      return join(homedir(), "AppData", "Local", "Logs", appName);
+      return resolve(homedir(), "AppData", "Local", "Logs", appName, fileName);
 
     case "linux": // Linux
-      return join(homedir(), ".local", "share", "logs", appName);
+      return resolve(homedir(), ".local", "share", "logs", appName, fileName);
 
     default:
       throw new Error("Unsupported operating system");
@@ -39,14 +39,14 @@ export type LogLevel = typeof logLevelSchema.infer;
 const formatMessage = (
   level: LogLevel,
   message: unknown,
-  meta: Record<string, unknown>
+  meta: Record<string, unknown>,
 ) => {
   const timestamp = new Date().toISOString();
   const metaStr = Object.keys(meta).length
     ? `\n${JSON.stringify(meta, null, 2)}`
     : "";
   return `${timestamp} [${level.padEnd(5)}] ${JSON.stringify(
-    message
+    message,
   )}${metaStr}\n`;
 };
 
@@ -55,13 +55,14 @@ const loggerConfigSchema = type({
   filename: "string",
   level: logLevelSchema,
 });
-const loggerConfigMorph = loggerConfigSchema.pipe((config) => {
-  const filename = resolve(getLogDirectory(config.appName), config.filename);
+export const loggerConfigMorph = loggerConfigSchema.pipe((config) => {
+  const filename = getLogFilePath(config.appName, config.filename);
   const levels = logLevels.slice(logLevels.indexOf(config.level));
   return { ...config, levels, filename };
 });
-type InputLoggerConfig = typeof loggerConfigSchema.infer;
-type FullLoggerConfig = typeof loggerConfigMorph.infer;
+
+export type InputLoggerConfig = typeof loggerConfigSchema.infer;
+export type FullLoggerConfig = typeof loggerConfigMorph.infer;
 
 /**
  * Creates a logger instance with configurable options for logging to a file.
@@ -78,12 +79,12 @@ export function createLogger(inputConfig: InputLoggerConfig) {
   const queue: Promise<void>[] = [];
   const log = (level: LogLevel, message: unknown, meta?: typeof logMeta) => {
     if (!config.levels.includes(level)) return;
-    ensureDirSync(getLogDirectory(config.appName));
+    ensureDirSync(dirname(getLogFilePath(config.appName, config.filename)));
     queue.push(
       appendFile(
         config.filename,
-        formatMessage(level, message, { ...logMeta, ...(meta ?? {}) })
-      )
+        formatMessage(level, message, { ...logMeta, ...(meta ?? {}) }),
+      ),
     );
   };
 
