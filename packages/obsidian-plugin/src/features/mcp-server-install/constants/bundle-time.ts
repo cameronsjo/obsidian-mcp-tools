@@ -1,8 +1,11 @@
 import { type } from "arktype";
+import { clean } from "semver";
 
 const envVar = type({
   GITHUB_DOWNLOAD_URL: "string.url",
-  GITHUB_REF_NAME: "string.semver",
+  GITHUB_REF_NAME: type("string")
+    .pipe((ref) => clean(ref))
+    .to("string.semver"),
 });
 
 /**
