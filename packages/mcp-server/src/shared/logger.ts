@@ -6,7 +6,7 @@ import { createLogger } from "shared";
  * and uses the "INFO" log level in production environments and "DEBUG" in development environments.
  */
 export const logger = createLogger({
-  appName: "obsidian-mcp-tools",
-  filename: "mcp-server.log",
+  appName: "Claude",
+  filename: "mcp-server-obsidian-mcp-tools.log",
   level: process.env.NODE_ENV === "production" ? "INFO" : "DEBUG",
 });

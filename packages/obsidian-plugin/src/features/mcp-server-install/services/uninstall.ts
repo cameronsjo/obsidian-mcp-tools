@@ -1,9 +1,9 @@
+import { logger } from "$/shared/logger";
 import fsp from "fs/promises";
-import path from "path";
 import { Plugin } from "obsidian";
-import { logger } from "../../../shared/logger";
+import path from "path";
 import { BINARY_NAME } from "../constants";
-import { getPlatform } from "./download";
+import { getPlatform } from "./install";
 
 /**
  * Uninstalls the MCP server by removing the binary and cleaning up configuration

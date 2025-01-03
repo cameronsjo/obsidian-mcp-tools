@@ -218,6 +218,7 @@ export async function installMcpServer(
     await ensureDirectory(installPath.dir);
 
     const progressNotice = new Notice("Downloading MCP server...", 0);
+    logger.debug("Downloading MCP server:", { downloadUrl, installPath });
 
     const download$ = downloadFile(downloadUrl, installPath.path);
 

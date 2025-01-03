@@ -18,7 +18,7 @@ export class ObsidianMcpServer {
   constructor() {
     this.server = new Server(
       {
-        name: "obsidian-mcp-server",
+        name: "obsidian-mcp-tools",
         version: "0.1.0",
       },
       {
@@ -36,7 +36,7 @@ export class ObsidianMcpServer {
     // Error handling
     this.server.onerror = (error) => {
       logger.error("Server error", { error });
-      console.error("[MCP Error]", error);
+      console.error("[MCP Tools Error]", error);
     };
     process.on("SIGINT", async () => {
       await this.server.close();
@@ -69,7 +69,6 @@ export class ObsidianMcpServer {
     try {
       await this.server.connect(transport);
       logger.debug("Server started successfully");
-      console.error("Obsidian MCP server running on stdio");
     } catch (err) {
       logger.fatal("Failed to start server", {
         error: err instanceof Error ? err.message : String(err),

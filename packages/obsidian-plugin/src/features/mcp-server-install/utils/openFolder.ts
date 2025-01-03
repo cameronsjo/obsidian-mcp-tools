@@ -1,6 +1,6 @@
+import { logger } from "$/shared/logger";
 import { exec } from "child_process";
 import { Notice } from "obsidian";
-import { logger } from "../../../shared/logger";
 
 /**
  * Opens a folder in the system's default file explorer

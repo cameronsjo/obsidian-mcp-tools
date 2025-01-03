@@ -6,13 +6,21 @@
 
 [Features](#features) | [Installation](#installation) | [Configuration](#configuration) | [Troubleshooting](#troubleshooting) | [Security](#security) | [Development](#development) | [Support](#support)
 
-Obsidian MCP Tools enhances your Obsidian experience by providing a Model Context Protocol (MCP) server that enables advanced features like semantic search, template execution, and AI-powered tools.
+Obsidian MCP Tools enables AI applications like Claude Desktop to securely access and work with your Obsidian vault through the Model Context Protocol (MCP). MCP is an open protocol that standardizes how AI applications can interact with external data sources and tools while maintaining security and user control. [^2]
+
+When you install this plugin, it sets up a local MCP server that acts as a secure bridge between your Obsidian vault and MCP-compatible AI applications. This means AI assistants can read your notes, execute templates, and perform semantic searches - but only with your explicit permission and without requiring direct access to your vault. [^3]
+
+> **Privacy Note**: When using Claude Desktop with this plugin, your conversations with Claude are not used to train Anthropic's models by default. [^1]
 
 ## Features
 
-- **Semantic Search**: Leverage advanced search capabilities to find relevant notes based on meaning, not just keywords
-- **Template Execution**: Run templates with dynamic parameters and AI-powered content generation
-- **AI Integration**: Connect with Claude Desktop for enhanced functionality
+When connected to an MCP client like Claude Desktop, this plugin enables:
+
+- **Vault Access**: Allows AI assistants to read and reference your notes while maintaining your vault's security [^4]
+- **Semantic Search**: AI assistants can search your vault based on meaning and context, not just keywords [^5]
+- **Template Integration**: Execute Obsidian templates through AI interactions, with dynamic parameters and content generation [^6]
+
+All features require an MCP-compatible client like Claude Desktop, as this plugin provides the server component that enables these integrations. The plugin does not modify Obsidian's functionality directly - instead, it creates a secure bridge that allows AI applications to work with your vault in powerful ways.
 
 ## Prerequisites
 
@@ -25,16 +33,19 @@ Obsidian MCP Tools enhances your Obsidian experience by providing a Model Contex
 ### Recommended
 
 - [Templater](https://silentvoid13.github.io/Templater/) plugin for enhanced template functionality
-- [Smart Connections](https://smartconnections.app/) plugin for improved semantic search capabilities
+- [Smart Connections](https://smartconnections.app/) plugin for semantic search capabilities
 
 ## Installation
+
+> [!Important]
+> This plugin requires a secure server component that runs locally on your computer. The server is distributed as a signed executable, with its complete source code available in `packages/mcp-server/`. For details about our security measures and code signing process, see the [Security](#security) section.
 
 1. Install the plugin from Obsidian's Community Plugins
 2. Enable the plugin in Obsidian settings
 3. Open the plugin settings
 4. Click "Install Server" to download and configure the MCP server
 
-The plugin will:
+Clicking the install button will:
 
 - Download the appropriate MCP server binary for your platform
 - Configure Claude Desktop to use the server
@@ -184,3 +195,12 @@ See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each release.
 ## License
 
 [MIT License](LICENSE)
+
+## Footnotes
+
+[^1]: For information about Claude data privacy and security, see [Claude AI's data usage policy](https://support.anthropic.com/en/articles/8325621-i-would-like-to-input-sensitive-data-into-free-claude-ai-or-claude-pro-who-can-view-my-conversations)
+[^2]: For more information about the Model Context Protocol, see [MCP Introduction](https://modelcontextprotocol.io/introduction)
+[^3]: For a list of available MCP Clients, see [MCP Example Clients](https://modelcontextprotocol.io/clients)
+[^4]: Requires Obsidian plugin Local REST API
+[^5]: Requires Obsidian plugin Smart Connections
+[^6]: Requires Obsidian plugin Templater

@@ -2,7 +2,7 @@ import fsp from "fs/promises";
 import { Plugin } from "obsidian";
 import os from "os";
 import path from "path";
-import { logger } from "../../../shared/logger";
+import { logger } from "$/shared/logger";
 import { CLAUDE_CONFIG_PATH } from "../constants";
 
 interface ClaudeConfig {
