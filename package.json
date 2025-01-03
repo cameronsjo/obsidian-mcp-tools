@@ -1,11 +1,13 @@
 {
   "name": "obsidian-mcp-tools",
+  "version": "0.2.3",
   "private": true,
   "description": "A collection of Model Context Protocol (MCP) tools for Obsidian.md",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
+    "version": "bun scripts/version.ts",
     "release": "bun --filter '*' release",
     "zip": "bun --filter '*' zip"
   },
