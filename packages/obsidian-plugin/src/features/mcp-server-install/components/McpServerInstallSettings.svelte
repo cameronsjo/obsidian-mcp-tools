@@ -1,21 +1,20 @@
 <script lang="ts">
+  import type McpToolsPlugin from "$/main";
+  import { FULL_LOGGER_FILENAME, loadDependenciesArray } from "$/shared";
   import { Notice } from "obsidian";
-  import { getLogDirectory } from "shared";
-  import type McpToolsPlugin from "src/main";
-  import { loadDependenciesArray } from "src/shared";
+  import { dirname } from "path";
   import { onMount } from "svelte";
   import {
     removeFromClaudeConfig,
     updateClaudeConfig,
   } from "../services/config";
-  import { installMcpServer } from "../services/download";
+  import { installMcpServer } from "../services/install";
   import { getInstallationStatus } from "../services/status";
   import { uninstallServer } from "../services/uninstall";
   import type { InstallationStatus } from "../types";
   import { openFolder } from "../utils/openFolder";
 
   export let plugin: McpToolsPlugin;
-  console.log("plugin", plugin);
 
   // Dependencies and API key status
   const deps = loadDependenciesArray(plugin);
@@ -132,7 +131,7 @@
 
   <div class="link-item">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <a on:click={() => openFolder(getLogDirectory(plugin.manifest.id))}>
+    <a on:click={() => openFolder(dirname(FULL_LOGGER_FILENAME))}>
       Server Log Folder
     </a>
   </div>
