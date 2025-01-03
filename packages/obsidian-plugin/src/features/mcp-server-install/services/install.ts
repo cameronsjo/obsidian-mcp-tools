@@ -26,7 +26,9 @@ export function getArch(): Arch {
 }
 
 export function getDownloadUrl(platform: Platform, arch: Arch): string {
-  return `${GITHUB_DOWNLOAD_URL}/mcp-server-${platform}-${arch}`;
+  return platform === "windows"
+    ? `${GITHUB_DOWNLOAD_URL}/mcp-server-${platform}.exe`
+    : `${GITHUB_DOWNLOAD_URL}/mcp-server-${platform}-${arch}`;
 }
 
 /**
