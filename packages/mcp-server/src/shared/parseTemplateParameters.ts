@@ -70,6 +70,5 @@ export function parseTemplateParameters(content: string): PromptParameter[] {
     }
   }
 
-  logger.debug("Parsed template parameters", { parameters });
   return parameters;
 }
