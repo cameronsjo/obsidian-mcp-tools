@@ -9,7 +9,7 @@ on:
 
 jobs:
   release:
-    if: github.ref_type == 'tag' && github.ref == 'refs/heads/main'
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write
