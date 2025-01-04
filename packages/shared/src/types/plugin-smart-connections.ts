@@ -95,8 +95,3 @@ export interface SmartSearch {
    */
   search(search_text: string, filter?: SearchFilter): Promise<SearchResult[]>;
 }
-
-declare global {
-  // eslint-disable-next-line no-var -- we must use a var here so that the global declaration works as expected. Using let/const would cause incorrect behaviour.
-  var SmartSearch: SmartSearch;
-}
