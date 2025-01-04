@@ -36,11 +36,16 @@ export interface Dependencies {
   "templater-obsidian": Dependency<"templater-obsidian", Templater.ITemplater>;
 }
 
+// The Smart Connections plugin exposes a global variable `window.SmartSearch` but it's not guaranteed to be available.
+declare const window: {
+  SmartSearch?: SmartConnections.SmartSearch;
+} & Window;
+
 export const loadSmartSearchAPI = (plugin: McpToolsPlugin) =>
   interval(200).pipe(
     takeUntil(timer(5000)),
     map((): Dependencies["smart-connections"] => {
-      const api = typeof SmartSearch === "undefined" ? undefined : SmartSearch;
+      const api = window.SmartSearch;
       return {
         id: "smart-connections",
         name: "Smart Connections",

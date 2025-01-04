@@ -95,8 +95,3 @@ export interface SmartSearch {
    */
   search(search_text: string, filter?: SearchFilter): Promise<SearchResult[]>;
 }
-
-declare global {
-  // eslint-disable-next-line no-var
-  var SmartSearch: SmartSearch | undefined;
-}
