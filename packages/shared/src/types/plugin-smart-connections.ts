@@ -97,6 +97,6 @@ export interface SmartSearch {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
-  var SmartSearch: SmartSearch | undefined;
+  // eslint-disable-next-line no-var -- we must use a var here so that the global declaration works as expected. Using let/const would cause incorrect behaviour.
+  var SmartSearch: SmartSearch;
 }
