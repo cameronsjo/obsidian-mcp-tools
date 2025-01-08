@@ -1,15 +1,14 @@
 import { logger } from "$/shared/logger";
 import { exec } from "child_process";
-import { Notice } from "obsidian";
+import { Notice, Platform } from "obsidian";
 
 /**
  * Opens a folder in the system's default file explorer
  */
 export function openFolder(folderPath: string): void {
-  const platform = process.platform;
-  const command = platform === "win32"
+  const command = Platform.isWin
     ? `start "" "${folderPath}"`
-    : platform === "darwin"
+    : Platform.isMacOS
       ? `open "${folderPath}"`
       : `xdg-open "${folderPath}"`;
 
