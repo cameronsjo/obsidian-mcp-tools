@@ -13,33 +13,6 @@ import { getPlatform } from "./install";
 const execAsync = promisify(exec);
 
 /**
- * Checks if Claude Desktop is installed by attempting to read its config file
- */
-export async function isClaudeDesktopInstalled(): Promise<boolean> {
-  const platform = process.platform;
-  const configPath =
-    platform === "win32"
-      ? path.join(
-          process.env.APPDATA || "",
-          "Claude",
-          "claude_desktop_config.json",
-        )
-      : platform === "darwin"
-        ? path.join(
-            process.env.HOME || "",
-            "Library/Application Support/Claude/claude_desktop_config.json",
-          )
-        : path.join(process.env.HOME || "", ".config/claude/config.json");
-
-  try {
-    await fsp.access(configPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Resolves the real path of the given file path, handling cases where the path is a symlink.
  *
  * @param filepath - The file path to resolve.
