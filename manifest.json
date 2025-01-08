@@ -3,7 +3,7 @@
   "name": "MCP Tools",
   "version": "0.2.18",
   "minAppVersion": "0.15.0",
-  "description": "Chat with your notes in Claude Desktop and other Model Context Protocol (MCP) Clients.",
+  "description": "Securely connect Claude Desktop to your vault with semantic search, templates, and file management capabilities.",
   "author": "Jack Steam",
   "authorUrl": "https://github.com/jacksteamdev",
   "fundingUrl": "https://github.com/sponsors/jacksteamdev",

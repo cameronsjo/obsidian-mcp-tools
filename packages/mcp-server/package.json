@@ -1,6 +1,6 @@
 {
   "name": "@obsidian-mcp-tools/mcp-server",
-  "description": "Chat with your Obsidian notes in Claude Desktop and other MCP Clients. Requires obsidian-local-rest-api and smart-connections plugins.",
+  "description": "A secure MCP server implementation that provides standardized access to Obsidian vaults through the Model Context Protocol.",
   "type": "module",
   "module": "src/index.ts",
   "scripts": {

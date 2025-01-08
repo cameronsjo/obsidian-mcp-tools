@@ -1,6 +1,6 @@
 {
 	"name": "@obsidian-mcp-tools/obsidian-plugin",
-	"description": "Chat with your Obsidian notes in Claude Desktop and other MCP Clients. Requires obsidian-local-rest-api and smart-connections plugins.",
+	"description": "The Obsidian plugin component for MCP Tools, enabling secure connections between Obsidian and Claude Desktop through the Model Context Protocol (MCP).",
 	"keywords": [
 		"MCP",
 		"Claude",
