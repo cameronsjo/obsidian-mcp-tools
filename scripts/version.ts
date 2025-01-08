@@ -10,6 +10,17 @@ if (!!status.text() && !process.env.FORCE) {
   process.exit(1);
 }
 
+// Check if on main branch
+const currentBranch = (await $`git rev-parse --abbrev-ref HEAD`.quiet())
+  .text()
+  .trim();
+if (currentBranch !== "main" && !process.env.FORCE) {
+  console.error(
+    "Not on main branch. Switch to main before releasing or run with FORCE=true.",
+  );
+  process.exit(1);
+}
+
 // Bump project version
 const semverPart = Bun.argv[3] || "patch";
 const json = await Bun.file("./package.json").json();
