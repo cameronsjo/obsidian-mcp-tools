@@ -1,70 +1,142 @@
-# obsidian-mcp-server MCP Server
+# MCP Tools Server
 
-A Model Context Protocol server that proxies the Obsidian Local REST API endpoints.
-
-This is a TypeScript-based MCP server that implements a simple notes system. It demonstrates core MCP concepts by providing:
-
-- Resources representing text notes with URIs and metadata
-- Tools for creating new notes
-- Prompts for generating summaries of notes
+A secure Model Context Protocol (MCP) server that provides authenticated access to Obsidian vaults. This server implements MCP endpoints for accessing notes, executing templates, and performing semantic search through Claude Desktop and other MCP clients.
 
 ## Features
 
-### Resources
-- List and access notes via `note://` URIs
-- Each note has a title, content and metadata
-- Plain text mime type for simple content access
+### Resource Access
+
+- Read and write vault files via `note://` URIs
+- Access file metadata and frontmatter
+- Semantic search through Smart Connections
+- Template execution via Templater
+
+### Security
+
+- Binary attestation with SLSA provenance
+- Encrypted communication via Local REST API
+- Platform-specific credential storage
+- Minimal required permissions
 
 ### Tools
-- `create_note` - Create new text notes
-  - Takes title and content as required parameters
-  - Stores note in server state
 
-### Prompts
-- `summarize_notes` - Generate a summary of all stored notes
-  - Includes all note contents as embedded resources
-  - Returns structured prompt for LLM summarization
-
-## Development
-
-Install dependencies:
-```bash
-npm install
-```
-
-Build the server:
-```bash
-npm run build
-```
-
-For development with auto-rebuild:
-```bash
-npm run watch
-```
+- File operations (create, read, update, delete)
+- Semantic search with filters
+- Template execution with parameters
+- Vault directory listing
 
 ## Installation
 
-To use with Claude Desktop, add the server config:
+The server is typically installed automatically through the Obsidian plugin. For manual installation:
 
-On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+```bash
+# Install dependencies
+bun install
+
+# Build the server
+bun run build
+```
+
+````
+
+### Configuration
+
+Server configuration is managed through Claude Desktop's config file:
+
+On macOS:
 
 ```json
+// ~/Library/Application Support/Claude/claude_desktop_config.json
 {
   "mcpServers": {
-    "obsidian-mcp-server": {
-      "command": "/path/to/obsidian-mcp-server/build/index.js"
+    "obsidian-mcp-tools": {
+      "command": "/path/to/mcp-server",
+      "env": {
+        "OBSIDIAN_API_KEY": "your-api-key"
+      }
     }
   }
 }
 ```
 
-### Debugging
-
-Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
+## Development
 
 ```bash
-npm run inspector
+# Start development server with auto-reload
+bun run dev
+
+# Run tests
+bun test
+
+# Build for all platforms
+bun run build:all
+
+# Use MCP Inspector for debugging
+bun run inspector
 ```
 
-The Inspector will provide a URL to access debugging tools in your browser.
+### Project Structure
+
+```
+src/
+├── features/           # Feature modules
+│   ├── core/          # Server core
+│   ├── fetch/         # Web content fetching
+│   ├── local-rest-api/# API integration
+│   ├── prompts/       # Prompt handling
+│   └── templates/     # Template execution
+├── shared/            # Shared utilities
+└── types/             # TypeScript types
+```
+
+### Binary Distribution
+
+Server binaries are published with SLSA Provenance attestations. To verify a binary:
+
+```bash
+gh attestation verify --owner jacksteamdev <binary>
+```
+
+This verifies:
+
+- Binary's SHA256 hash
+- Build origin from this repository
+- Compliance with SLSA Level 3
+
+## Protocol Implementation
+
+### Resources
+
+- `note://` - Vault file access
+- `template://` - Template execution
+- `search://` - Semantic search
+
+### Tools
+
+- `create_note` - Create new files
+- `update_note` - Modify existing files
+- `execute_template` - Run Templater templates
+- `semantic_search` - Smart search integration
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Update documentation
+5. Submit a pull request
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
+
+## Security
+
+For security issues, please:
+
+1. **DO NOT** open a public issue
+2. Email [jacksteamdev+security@gmail.com](mailto:jacksteamdev+security@gmail.com)
+3. Follow responsible disclosure practices
+
+## License
+
+[MIT License](LICENSE)
+````
