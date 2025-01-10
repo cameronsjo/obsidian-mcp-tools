@@ -1,103 +1,43 @@
 # Project Architecture
 
-Use the following structure and conventions for all new features.
-
-## Monorepo Structure
-
-This project uses a monorepo with multiple packages:
-
-- `packages/mcp-server` - The MCP server implementation
-- `packages/obsidian-plugin` - The Obsidian plugin
-- `packages/shared` - Shared code between packages
-- `docs/` - Project documentation
-- `docs/features` - Feature requirements
-
-### Package Organization
+## Structure
 
 ```
 packages/
-├── mcp-server/           # Server implementation
-│   ├── dist/            # Compiled output
-│   ├── logs/           # Server logs
-│   ├── playground/     # Development testing
-│   ├── scripts/        # Build and utility scripts
-│   └── src/            # Source code
-│
-├── obsidian-plugin/     # Obsidian plugin
-│   ├── docs/           # Documentation
-│   ├── src/
-│   │   ├── features/   # Feature modules
-│   │   └── main.ts     # Plugin entry point
-│   └── manifest.json   # Plugin metadata
-│
-└── shared/             # Shared utilities and types
-    └── src/
-        ├── types/      # Common interfaces
-        ├── utils/      # Common utilities
-        └── constants/  # Shared configuration
+├── mcp-server/        # Server implementation
+├── obsidian-plugin/   # Obsidian plugin
+└── shared/           # Shared utilities and types
 ```
 
-## Feature-Based Architecture
+## Features
 
-The Obsidian plugin uses a feature-based architecture where each feature is a self-contained module.
-
-### Feature Structure
+- Self-contained modules in src/features/ with structure:
 
 ```
-src/features/
-├── core/                # Plugin initialization and settings
-├── mcp-server-install/ # Binary management
-├── mcp-server-prompts/ # Template execution
-└── smart-search/       # Search functionality
-
-Each feature contains:
 feature/
-├── components/    # UI components
-├── services/     # Business logic
-├── types.ts      # Feature-specific types
-├── utils.ts      # Feature-specific utilities
-├── constants.ts  # Feature-specific constants
-└── index.ts      # Public API with setup function
+├── components/    # Svelte UI components
+├── services/     # Core business logic
+├── constants/    # Feature-specific constants
+├── types.ts      # Types and interfaces
+├── utils.ts      # Helper functions
+└── index.ts      # Public API & setup
 ```
 
-### Feature Management
+- feature/index.ts exports a setup function:
 
-Each feature exports a setup function for initialization:
+  - `function setup(plugin: McpToolsPlugin): { success: true } | { success: false, error: string }`
 
-```typescript
-export async function setup(plugin: Plugin): Promise<SetupResult> {
-  // Check dependencies
-  // Initialize services
-  // Register event handlers
-  return { success: true } || { success: false, error: "reason" };
-}
-```
+- Handle dependencies and state:
 
-Features:
+  - Check dependencies on setup
+  - Use Svelte stores for UI state
+  - Persist settings via Obsidian API
+  - Clean up on unload/errors
 
-- Initialize independently
-- Handle their own dependencies
-- Continue running if other features fail
-- Log failures for debugging
-
-### McpToolsPlugin Settings Management
-
-Use TypeScript module augmentation to extend the McpToolsPluginSettings interface:
+- Extend plugin settings:
 
 ```typescript
-// packages/obsidian-plugin/src/types.ts
-declare module "obsidian" {
-  interface McpToolsPluginSettings {
-    version?: string;
-  }
-
-  interface Plugin {
-    loadData(): Promise<McpToolsPluginSettings>;
-    saveData(data: McpToolsPluginSettings): Promise<void>;
-  }
-}
-
-// packages/obsidian-plugin/src/features/some-feature/types.ts
+// features/some-feature/types.ts
 declare module "obsidian" {
   interface McpToolsPluginSettings {
     featureName?: {
@@ -108,45 +48,119 @@ declare module "obsidian" {
 }
 ```
 
-Extending the settings interface allows for type-safe access to feature settings 
-via `McpToolsPlugin.loadData()` and `McpToolsPlugin.saveData()`.
+- Export UI components:
 
-### Version Management
+```typescript
+// index.ts
+export { default as FeatureSettings } from "./components/SettingsTab.svelte";
+export * from "./constants";
+export * from "./types";
+```
 
-Unified version approach:
-
-- Plugin and server share version number
-- Version stored in plugin manifest
-- Server binaries include version in filename
-- Version checked during initialization
-
-### UI Integration
-
-The core feature provides a PluginSettingTab that:
-
-- Loads UI components from each feature
-- Maintains consistent UI organization
-- Handles conditional rendering based on feature state
-
-### Error Handling
-
-Features implement consistent error handling:
+## Error Handling
 
 - Return descriptive error messages
-- Log detailed information for debugging
-- Provide user feedback via Obsidian Notice API
+- Log errors with full context
 - Clean up resources on failure
+- Use Obsidian Notice for user feedback
+- Catch and handle async errors
+- Format errors for client responses
 
-## Development Workflow
+## Type Safety
 
-1. Make changes in relevant package
-2. Run build scripts if needed
-3. Test in playground environments
-4. Update documentation as needed
+- Use ArkType for runtime validation
+- Define types with inference:
 
-## Build Configuration
+```typescript
+const schema = type({
+  name: "string",
+  required: "boolean?",
+  config: {
+    maxSize: "number",
+    mode: "'strict'|'loose'",
+  },
+});
+type Config = typeof schema.infer;
+```
 
-- TypeScript configuration in each package
-- ESBuild for Obsidian plugin bundling
-- Version management through versions.json
-- Shared tsconfig settings where appropriate
+- Validate external data:
+
+```typescript
+const result = schema(untrustedData);
+if (result instanceof type.errors) {
+  throw new Error(result.summary);
+}
+```
+
+- Pipe transformations:
+
+```typescript
+const transformed = type("string.json.parse")
+  .pipe(searchSchema)
+  .to(parametersSchema);
+```
+
+- Add descriptions for better errors:
+
+```typescript
+type({
+  query: type("string>0").describe("Search text cannot be empty"),
+  limit: type("number>0").describe("Result limit must be positive"),
+});
+```
+
+## Development
+
+- Write in TypeScript strict mode
+- Use Bun for building/testing
+- Test features in isolation
+
+## Core Integrations
+
+- Obsidian API for vault access
+- Obsidian plugins
+  - Local REST API for communication
+  - Smart Connections for search
+  - Templater for templates
+
+## Coding Style
+
+- Prefer functional over OOP
+- Use pure functions when possible
+- Keep files focused on single responsibility
+- Use descriptive, action-oriented names
+- Place shared code in shared package
+- Keep components small and focused
+
+# Project Guidelines
+
+## Documentation Requirements
+
+- Update relevant documentation in /docs when modifying features
+- Keep README.md in sync with new capabilities
+- Maintain changelog entries in CHANGELOG.md
+
+## Task Summary Records
+
+When starting a task:
+
+- Create a new Markdown file in /cline_docs
+- Record the initial objective
+- Create a checklist of subtasks
+
+Maintain the task file:
+
+- Update the checklist after completing subtasks
+- Record what worked and didn't work
+
+When completing a task:
+
+- Summarize the task outcome
+- Verify the initial objective was completed
+- Record final insights
+
+## Testing Standards
+
+- Unit tests required for business logic
+- Integration tests for API endpoints
+- E2E tests for critical user flows
