@@ -1,5 +1,7 @@
 # Project Architecture
 
+Use the following structure and conventions for all new features.
+
 ## Monorepo Structure
 
 This project uses a monorepo with multiple packages:
@@ -7,6 +9,8 @@ This project uses a monorepo with multiple packages:
 - `packages/mcp-server` - The MCP server implementation
 - `packages/obsidian-plugin` - The Obsidian plugin
 - `packages/shared` - Shared code between packages
+- `docs/` - Project documentation
+- `docs/features` - Feature requirements
 
 ### Package Organization
 
@@ -30,7 +34,6 @@ packages/
     └── src/
         ├── types/      # Common interfaces
         ├── utils/      # Common utilities
-        ├── stores/     # Shared Svelte stores
         └── constants/  # Shared configuration
 ```
 
@@ -42,33 +45,32 @@ The Obsidian plugin uses a feature-based architecture where each feature is a se
 
 ```
 src/features/
-├── core/              # Plugin initialization and settings
-│   └── components/
-│       └── Settings.svelte  # Main settings component
-├── mcp-server-install/      # Binary management
-├── mcp-server-prompts/      # Template execution
-└── smart-search/            # Search functionality
+├── core/                # Plugin initialization and settings
+├── mcp-server-install/ # Binary management
+├── mcp-server-prompts/ # Template execution
+└── smart-search/       # Search functionality
 
 Each feature contains:
 feature/
-├── components/       # Svelte components (.svelte files)
-├── services/         # Business logic
-├── types.ts          # Feature-specific types
-├── utils.ts          # Feature-specific utilities
-├── constants.ts      # Feature-specific constants
-└── index.ts          # Public API with setup function
+├── components/    # UI components
+├── services/     # Business logic
+├── types.ts      # Feature-specific types
+├── utils.ts      # Feature-specific utilities
+├── constants.ts  # Feature-specific constants
+└── index.ts      # Public API with setup function
 ```
 
 ### Feature Management
 
-Each feature exports:
-
-- A setup function for initialization
-- Svelte components for UI
+Each feature exports a setup function for initialization:
 
 ```typescript
-export async function setup(plugin: Plugin): Promise<SetupResult>;
-export { default as FeatureSettings } from "./components/SettingsTab.svelte";
+export async function setup(plugin: Plugin): Promise<SetupResult> {
+  // Check dependencies
+  // Initialize services
+  // Register event handlers
+  return { success: true } || { success: false, error: "reason" };
+}
 ```
 
 Features:
@@ -78,56 +80,26 @@ Features:
 - Continue running if other features fail
 - Log failures for debugging
 
-### Component Integration
+### McpToolsPlugin Settings Management
 
-Components follow the Obsidian Svelte integration guide (https://docs.obsidian.md/Plugins/Getting+started/Use+Svelte+in+your+plugin):
-
-- Core Settings.svelte loads feature components
-- Components mount into Obsidian's DOM
-- Uses Obsidian's default CSS where possible
-
-### State Management
-
-- Feature-specific state in local Svelte stores
-- Shared state in `shared/stores`
-- Settings state managed through Obsidian API
-
-### Build Configuration
-
-- BunJS for building and development
-- Svelte compiler plugin for .svelte files
-- See the [Bun Docs](https://bun.sh/docs/runtime/plugins#loaders) and [this Gist](https://gist.github.com/buhrmi/6e6d2256888d8d385d66a5f6b20a203d) for implementation details.
+Use TypeScript module augmentation to extend the McpToolsPluginSettings interface:
 
 ```typescript
-// Bun plugin for Svelte compilation
-plugin({
-  name: "svelte-loader",
-  setup(build) {
-    build.onLoad({ filter: /\.svelte$/ }, async ({ path }) => {
-      const file = await Bun.file(path).text();
-      const result = compile(file, {
-        filename: path,
-        generate: "ssr",
-      });
-      // ... handle compilation
-    });
-  },
-});
-```
+// packages/obsidian-plugin/src/types.ts
+declare module "obsidian" {
+  interface McpToolsPluginSettings {
+    version?: string;
+  }
 
-### Settings Management
-
-Settings use TypeScript module augmentation:
-
-```typescript
-// shared/types/settings.ts
-export interface PluginSettings {
-  version: string;
+  interface Plugin {
+    loadData(): Promise<McpToolsPluginSettings>;
+    saveData(data: McpToolsPluginSettings): Promise<void>;
+  }
 }
 
-// features/some-feature/types.ts
-declare module "../../shared/types/settings" {
-  interface PluginSettings {
+// packages/obsidian-plugin/src/features/some-feature/types.ts
+declare module "obsidian" {
+  interface McpToolsPluginSettings {
     featureName?: {
       setting1?: string;
       setting2?: boolean;
@@ -135,6 +107,9 @@ declare module "../../shared/types/settings" {
   }
 }
 ```
+
+Extending the settings interface allows for type-safe access to feature settings
+via `McpToolsPlugin.loadData()` and `McpToolsPlugin.saveData()`.
 
 ### Version Management
 
@@ -145,6 +120,14 @@ Unified version approach:
 - Server binaries include version in filename
 - Version checked during initialization
 
+### UI Integration
+
+The core feature provides a PluginSettingTab that:
+
+- Loads UI components from each feature
+- Maintains consistent UI organization
+- Handles conditional rendering based on feature state
+
 ### Error Handling
 
 Features implement consistent error handling:
@@ -153,10 +136,3 @@ Features implement consistent error handling:
 - Log detailed information for debugging
 - Provide user feedback via Obsidian Notice API
 - Clean up resources on failure
-
-## Development Workflow
-
-1. Make changes in relevant package
-2. Run BunJS scripts for development
-3. Test in playground environments
-4. Update documentation as needed

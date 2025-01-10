@@ -145,6 +145,14 @@ Do not report security vulnerabilities in public issues.
 
 ## Development
 
+This project uses a monorepo structure with feature-based architecture. For detailed project architecture documentation, see [.clinerules](.clinerules).
+
+### Using Cline
+
+Some code in this project was implemented using the AI coding agent [Cline](https://cline.bot). Cline uses the `.clinerules` file to understand project architecture and patterns when implementing new features.
+
+### Workspace
+
 This project uses a bun workspace structure:
 
 ```
