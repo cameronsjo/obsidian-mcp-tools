@@ -1,6 +1,6 @@
 # Project Architecture
 
-This repo is in the process of migrating to a new project structure. Use the following structure and conventions for all new features.
+Use the following structure and conventions for all new features.
 
 ## Monorepo Structure
 
@@ -80,19 +80,26 @@ Features:
 - Continue running if other features fail
 - Log failures for debugging
 
-### Settings Management
+### McpToolsPlugin Settings Management
 
-Settings use TypeScript module augmentation:
+Use TypeScript module augmentation to extend the McpToolsPluginSettings interface:
 
 ```typescript
-// shared/types/settings.ts
-export interface PluginSettings {
-  version: string;
+// packages/obsidian-plugin/src/types.ts
+declare module "obsidian" {
+  interface McpToolsPluginSettings {
+    version?: string;
+  }
+
+  interface Plugin {
+    loadData(): Promise<McpToolsPluginSettings>;
+    saveData(data: McpToolsPluginSettings): Promise<void>;
+  }
 }
 
-// features/some-feature/types.ts
-declare module "../../shared/types/settings" {
-  interface PluginSettings {
+// packages/obsidian-plugin/src/features/some-feature/types.ts
+declare module "obsidian" {
+  interface McpToolsPluginSettings {
     featureName?: {
       setting1?: string;
       setting2?: boolean;
@@ -100,6 +107,9 @@ declare module "../../shared/types/settings" {
   }
 }
 ```
+
+Extending the settings interface allows for type-safe access to feature settings 
+via `McpToolsPlugin.loadData()` and `McpToolsPlugin.saveData()`.
 
 ### Version Management
 
