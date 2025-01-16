@@ -15,7 +15,8 @@
     <h1>Understanding Express Routes: A Complete Guide</h1>
     <div class="metadata">
       <address class="author">
-        By <a rel="author" href="/authors/jane-doe">Jane Doe</a>
+        <!-- svelte-ignore a11y_invalid_attribute -->
+        By <a rel="author" href="#">Jane Doe</a>
       </address>
       <time datetime="2023-12-14">December 14, 2023</time>
     </div>
@@ -69,9 +70,12 @@ app.get('/protected', authMiddleware, (req, res) => {
     <div class="share">
       <h3>Share this article</h3>
       <nav class="social-links">
-        <a href="#twitter">Twitter</a>
-        <a href="#linkedin">LinkedIn</a>
-        <a href="#facebook">Facebook</a>
+        <!-- svelte-ignore a11y_invalid_attribute -->
+        <a href="#">Twitter</a>
+        <!-- svelte-ignore a11y_invalid_attribute -->
+        <a href="#">LinkedIn</a>
+        <!-- svelte-ignore a11y_invalid_attribute -->
+        <a href="#">Facebook</a>
       </nav>
     </div>
   </footer>
