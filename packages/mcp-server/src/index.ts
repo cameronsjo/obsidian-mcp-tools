@@ -11,10 +11,10 @@ async function main() {
       throw new Error("OBSIDIAN_API_KEY environment variable is required");
     }
 
-    logger.debug("Starting Obsidian MCP server...");
+    logger.debug("Starting MCP Tools for Obsidian server...");
     const server = new ObsidianMcpServer();
     await server.run();
-    logger.debug("Obsidian MCP server is running");
+    logger.debug("MCP Tools for Obsidian server is running");
   } catch (error) {
     logger.fatal("Failed to start server", {
       error: error instanceof Error ? error.message : String(error),

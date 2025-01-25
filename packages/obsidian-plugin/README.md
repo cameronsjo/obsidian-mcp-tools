@@ -1,4 +1,4 @@
-# MCP Tools Plugin for Obsidian
+# MCP Tools for Obsidian - Plugin
 
 The Obsidian plugin component of MCP Tools, providing secure MCP server integration for accessing Obsidian vaults through Claude Desktop and other MCP clients.
 

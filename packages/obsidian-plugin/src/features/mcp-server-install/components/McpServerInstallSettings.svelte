@@ -72,17 +72,17 @@
 </script>
 
 <div class="installation-status">
-  <h3>Installation Status</h3>
+  <h3>Installation status</h3>
 
   {#if status.state === "no api key"}
     <div class="error-message">Please configure the Local REST API plugin</div>
   {:else if status.state === "not installed"}
     <div class="status-message">
       MCP Server is not installed
-      <button on:click={handleInstall}>Install Server</button>
+      <button on:click={handleInstall}>Install server</button>
     </div>
   {:else if status.state === "installing"}
-    <div class="status-message">Installing MCP Server...</div>
+    <div class="status-message">Installing MCP server...</div>
   {:else if status.state === "installed"}
     <div class="status-message">
       MCP Server v{status.versions.server} is installed
@@ -94,7 +94,7 @@
       <button on:click={handleInstall}>Update</button>
     </div>
   {:else if status.state === "uninstalling"}
-    <div class="status-message">Uninstalling MCP Server...</div>
+    <div class="status-message">Uninstalling MCP server...</div>
   {:else if status.state === "error"}
     <div class="error-message">{status.error}</div>
   {/if}
@@ -106,7 +106,7 @@
   {#each $deps as dep (dep.id)}
     <div class="dependency-item">
       {#if dep.installed}
-        ✅ {dep.name} (Installed)
+        ✅ {dep.name} is installed
       {:else}
         ❌
         {dep.name}
@@ -124,7 +124,7 @@
     <div class="link-item">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <a on:click={() => status.dir && openFolder(status.dir)}>
-        Server Install Folder
+        Server install folder
       </a>
     </div>
   {/if}
@@ -132,7 +132,7 @@
   <div class="link-item">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <a on:click={() => openFolder(dirname(FULL_LOGGER_FILENAME))}>
-      Server Log Folder
+      Server log folder
     </a>
   </div>
 
@@ -141,7 +141,7 @@
       href="https://github.com/jacksteamdev/obsidian-mcp-tools"
       target="_blank"
     >
-      GitHub Repository
+      GitHub repository
     </a>
   </div>
 </div>

@@ -1,4 +1,4 @@
-# MCP Tools Server
+# MCP Tools for Obsidian - Server
 
 A secure Model Context Protocol (MCP) server that provides authenticated access to Obsidian vaults. This server implements MCP endpoints for accessing notes, executing templates, and performing semantic search through Claude Desktop and other MCP clients.
 

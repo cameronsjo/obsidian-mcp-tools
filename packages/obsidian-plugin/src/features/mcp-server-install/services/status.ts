@@ -8,6 +8,7 @@ import { clean, lt, valid } from "semver";
 import { promisify } from "util";
 import { BINARY_NAME } from "../constants";
 import type { InstallationStatus, InstallPathInfo } from "../types";
+import { getFileSystemAdapter } from "../utils/getFileSystemAdapter";
 import { getPlatform } from "./install";
 
 const execAsync = promisify(exec);
@@ -63,10 +64,15 @@ async function resolveSymlinks(filepath: string): Promise<string> {
   }
 }
 
-export async function getInstallPath(plugin: Plugin): Promise<InstallPathInfo> {
+export async function getInstallPath(
+  plugin: Plugin,
+): Promise<InstallPathInfo | { error: string }> {
+  const adapter = getFileSystemAdapter(plugin);
+  if ("error" in adapter) return adapter;
+
   const platform = getPlatform();
   const originalPath = path.join(
-    plugin.app.vault.adapter.basePath,
+    adapter.getBasePath(),
     plugin.app.vault.configDir,
     "plugins",
     plugin.manifest.id,
@@ -107,6 +113,14 @@ export async function getInstallationStatus(
 
   // Verify server binary is present
   const installPath = await getInstallPath(plugin);
+  if ("error" in installPath) {
+    return {
+      state: "error",
+      versions: { plugin: pluginVersion },
+      error: installPath.error,
+    };
+  }
+
   try {
     await fsp.access(installPath.path, fsp.constants.X_OK);
   } catch (error) {

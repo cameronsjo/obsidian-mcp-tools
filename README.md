@@ -1,4 +1,4 @@
-# Obsidian MCP Tools
+# MCP Tools for Obsidian
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/jacksteamdev/obsidian-mcp-tools)](https://github.com/jacksteamdev/obsidian-mcp-tools/releases/latest)
 [![Build status](https://img.shields.io/github/actions/workflow/status/jacksteamdev/obsidian-mcp-tools/release.yml)](https://github.com/jacksteamdev/obsidian-mcp-tools/actions)
@@ -6,7 +6,7 @@
 
 [Features](#features) | [Installation](#installation) | [Configuration](#configuration) | [Troubleshooting](#troubleshooting) | [Security](#security) | [Development](#development) | [Support](#support)
 
-Obsidian MCP Tools enables AI applications like Claude Desktop to securely access and work with your Obsidian vault through the Model Context Protocol (MCP). MCP is an open protocol that standardizes how AI applications can interact with external data sources and tools while maintaining security and user control. [^2]
+MCP Tools for Obsidian enables AI applications like Claude Desktop to securely access and work with your Obsidian vault through the Model Context Protocol (MCP). MCP is an open protocol that standardizes how AI applications can interact with external data sources and tools while maintaining security and user control. [^2]
 
 This plugin consists of two parts:
 1. An Obsidian plugin that adds MCP capabilities to your vault
@@ -149,11 +149,11 @@ This project uses a monorepo structure with feature-based architecture. For deta
 
 ### Using Cline
 
-Some code in this project was implemented using the AI coding agent [Cline](https://cline.bot). Cline uses the `.clinerules` file to understand project architecture and patterns when implementing new features.
+Some code in this project was implemented using the AI coding agent [Cline](https://cline.bot). Cline uses `cline_docs/` and the `.clinerules` file to understand project architecture and patterns when implementing new features.
 
 ### Workspace
 
-This project uses a bun workspace structure:
+This project uses a [Bun](https://bun.sh/) workspace structure:
 
 ```
 packages/
