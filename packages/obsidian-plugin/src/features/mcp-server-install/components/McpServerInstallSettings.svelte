@@ -106,7 +106,7 @@
   {#each $deps as dep (dep.id)}
     <div class="dependency-item">
       {#if dep.installed}
-        ✅ {dep.name} (Installed)
+        ✅ {dep.name} is installed
       {:else}
         ❌
         {dep.name}
@@ -124,7 +124,7 @@
     <div class="link-item">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <a on:click={() => status.dir && openFolder(status.dir)}>
-        Server Install Folder
+        Server install folder
       </a>
     </div>
   {/if}
@@ -132,7 +132,7 @@
   <div class="link-item">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <a on:click={() => openFolder(dirname(FULL_LOGGER_FILENAME))}>
-      Server Log Folder
+      Server log folder
     </a>
   </div>
 
@@ -141,7 +141,7 @@
       href="https://github.com/jacksteamdev/obsidian-mcp-tools"
       target="_blank"
     >
-      GitHub Repository
+      GitHub repository
     </a>
   </div>
 </div>
