@@ -4,20 +4,26 @@ import { Plugin } from "obsidian";
 import path from "path";
 import { BINARY_NAME } from "../constants";
 import { getPlatform } from "./install";
+import { getFileSystemAdapter } from "../utils/getFileSystemAdapter";
 
 /**
  * Uninstalls the MCP server by removing the binary and cleaning up configuration
  */
 export async function uninstallServer(plugin: Plugin): Promise<void> {
   try {
+    const adapter = getFileSystemAdapter(plugin);
+    if ("error" in adapter) {
+      throw new Error(adapter.error);
+    }
+
     // Remove binary
     const platform = getPlatform();
     const binDir = path.join(
-      plugin.app.vault.adapter.basePath,
+      adapter.getBasePath(),
       plugin.app.vault.configDir,
       "plugins",
       plugin.manifest.id,
-      "bin"
+      "bin",
     );
     const binaryPath = path.join(binDir, BINARY_NAME[platform]);
 
@@ -46,7 +52,7 @@ export async function uninstallServer(plugin: Plugin): Promise<void> {
     // Note: We don't remove the entire config file since it may contain other server configs
     const configPath = path.join(
       process.env.HOME || process.env.USERPROFILE || "",
-      "Library/Application Support/Claude/claude_desktop_config.json"
+      "Library/Application Support/Claude/claude_desktop_config.json",
     );
 
     try {
@@ -71,7 +77,7 @@ export async function uninstallServer(plugin: Plugin): Promise<void> {
     throw new Error(
       `Failed to uninstall server: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
     );
   }
 }

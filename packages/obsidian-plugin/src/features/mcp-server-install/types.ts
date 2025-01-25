@@ -42,11 +42,6 @@ export interface InstallPathInfo {
 
 // Augment Obsidian's App type to include plugins
 declare module "obsidian" {
-  interface DataAdapter {
-    /** The absolute directory path for the Obsidian vault. */
-    basePath: string;
-  }
-
   interface App {
     plugins: {
       plugins: {

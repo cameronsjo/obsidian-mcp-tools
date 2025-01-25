@@ -216,6 +216,7 @@ export async function installMcpServer(
     const arch = getArch();
     const downloadUrl = getDownloadUrl(platform, arch);
     const installPath = await getInstallPath(plugin);
+    if ("error" in installPath) throw new Error(installPath.error);
 
     await ensureDirectory(installPath.dir);
 
@@ -247,7 +248,7 @@ export async function installMcpServer(
     });
   } catch (error) {
     new Notice(
-      `Failed to download MCP server: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to install MCP server: ${error instanceof Error ? error.message : String(error)}`,
     );
     throw error;
   }
