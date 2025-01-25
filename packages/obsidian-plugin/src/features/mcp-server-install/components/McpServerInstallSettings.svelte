@@ -72,17 +72,17 @@
 </script>
 
 <div class="installation-status">
-  <h3>Installation Status</h3>
+  <h3>Installation status</h3>
 
   {#if status.state === "no api key"}
     <div class="error-message">Please configure the Local REST API plugin</div>
   {:else if status.state === "not installed"}
     <div class="status-message">
       MCP Server is not installed
-      <button on:click={handleInstall}>Install Server</button>
+      <button on:click={handleInstall}>Install server</button>
     </div>
   {:else if status.state === "installing"}
-    <div class="status-message">Installing MCP Server...</div>
+    <div class="status-message">Installing MCP server...</div>
   {:else if status.state === "installed"}
     <div class="status-message">
       MCP Server v{status.versions.server} is installed
@@ -94,7 +94,7 @@
       <button on:click={handleInstall}>Update</button>
     </div>
   {:else if status.state === "uninstalling"}
-    <div class="status-message">Uninstalling MCP Server...</div>
+    <div class="status-message">Uninstalling MCP server...</div>
   {:else if status.state === "error"}
     <div class="error-message">{status.error}</div>
   {/if}
