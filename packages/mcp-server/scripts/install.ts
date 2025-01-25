@@ -26,7 +26,7 @@ function main() {
   };
 
   writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
-  console.log("Obsidian MCP Server added successfully.");
+  console.log("MCP Server added successfully.");
 }
 
 if (import.meta.main) {
