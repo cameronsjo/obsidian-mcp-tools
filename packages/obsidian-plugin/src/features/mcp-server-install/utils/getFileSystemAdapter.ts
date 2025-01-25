@@ -6,10 +6,9 @@ import { Plugin, FileSystemAdapter } from "obsidian";
  * @param plugin - The plugin to get the file system adapter for.
  * @returns The file system adapter, or `undefined` if not found.
  */
-
 export function getFileSystemAdapter(
-  plugin: Plugin
-): FileSystemAdapter | { error: string; } {
+  plugin: Plugin,
+): FileSystemAdapter | { error: string } {
   const adapter = plugin.app.vault.adapter;
   if (adapter instanceof FileSystemAdapter) {
     return adapter;
