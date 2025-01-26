@@ -6,6 +6,7 @@
     "module": "ESNext",
     "target": "ES2018",
     "allowJs": true,
+    "noEmit": true,
     "noImplicitAny": true,
     "moduleResolution": "bundler",
     "importHelpers": true,
