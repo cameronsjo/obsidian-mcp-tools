@@ -26,9 +26,13 @@ export function getArch(): Arch {
 }
 
 export function getDownloadUrl(platform: Platform, arch: Arch): string {
-  return platform === "windows"
-    ? `${GITHUB_DOWNLOAD_URL}/mcp-server-${platform}.exe`
-    : `${GITHUB_DOWNLOAD_URL}/mcp-server-${platform}-${arch}`;
+  if (platform === "windows") {
+    return `${GITHUB_DOWNLOAD_URL}/mcp-server-windows.exe`;
+  } else if (platform === "macos") {
+    return `${GITHUB_DOWNLOAD_URL}/mcp-server-macos-${arch}`;
+  } else { // linux
+    return `${GITHUB_DOWNLOAD_URL}/mcp-server-linux`;  // Linux binary doesn't include arch in filename
+  }
 }
 
 /**
