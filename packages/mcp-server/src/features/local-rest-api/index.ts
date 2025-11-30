@@ -425,4 +425,130 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // MOVE Vault File (read + write + delete)
+  tools.register(
+    type({
+      name: '"move_vault_file"',
+      arguments: {
+        source: type("string").describe("Source file path (vault-relative)"),
+        destination: type("string").describe("Destination file path (vault-relative)"),
+        "overwrite?": type("boolean").describe("Overwrite destination if it exists (default: false)"),
+      },
+    }).describe(
+      "Move a file from one location to another in your vault. This reads the source file, writes it to the destination, and deletes the source.",
+    ),
+    async ({ arguments: args }) => {
+      const sourcePath = validateVaultPath(args.source);
+      const destPath = validateVaultPath(args.destination);
+
+      // Check if destination exists (unless overwrite is true)
+      if (!args.overwrite) {
+        try {
+          await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(destPath)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+          // If we get here, the file exists
+          return {
+            content: [{
+              type: "text",
+              text: `Destination file already exists: ${destPath}. Use overwrite: true to replace it.`,
+            }],
+            isError: true,
+          };
+        } catch {
+          // File doesn't exist, good to proceed
+        }
+      }
+
+      // Read source file content
+      const content = await makeRequest(
+        LocalRestAPI.ApiContentResponse,
+        `/vault/${encodeURIComponent(sourcePath)}`,
+        { headers: { Accept: "text/markdown" } },
+      );
+
+      // Write to destination
+      await makeRequest(
+        LocalRestAPI.ApiNoContentResponse,
+        `/vault/${encodeURIComponent(destPath)}`,
+        {
+          method: "PUT",
+          body: content,
+        },
+      );
+
+      // Delete source
+      await makeRequest(
+        LocalRestAPI.ApiNoContentResponse,
+        `/vault/${encodeURIComponent(sourcePath)}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      return {
+        content: [{
+          type: "text",
+          text: `File moved successfully: ${sourcePath} → ${destPath}`,
+        }],
+      };
+    },
+  );
+
+  // RENAME Vault File (convenience wrapper around move)
+  tools.register(
+    type({
+      name: '"rename_vault_file"',
+      arguments: {
+        filename: type("string").describe("Current file path (vault-relative)"),
+        newName: type("string").describe("New filename (just the name, not path)"),
+      },
+    }).describe(
+      "Rename a file in your vault, keeping it in the same directory.",
+    ),
+    async ({ arguments: args }) => {
+      const sourcePath = validateVaultPath(args.filename);
+
+      // Extract directory from source path
+      const lastSlash = sourcePath.lastIndexOf("/");
+      const directory = lastSlash >= 0 ? sourcePath.substring(0, lastSlash + 1) : "";
+      const destPath = validateVaultPath(directory + args.newName);
+
+      // Read source file content
+      const content = await makeRequest(
+        LocalRestAPI.ApiContentResponse,
+        `/vault/${encodeURIComponent(sourcePath)}`,
+        { headers: { Accept: "text/markdown" } },
+      );
+
+      // Write to destination
+      await makeRequest(
+        LocalRestAPI.ApiNoContentResponse,
+        `/vault/${encodeURIComponent(destPath)}`,
+        {
+          method: "PUT",
+          body: content,
+        },
+      );
+
+      // Delete source
+      await makeRequest(
+        LocalRestAPI.ApiNoContentResponse,
+        `/vault/${encodeURIComponent(sourcePath)}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      return {
+        content: [{
+          type: "text",
+          text: `File renamed successfully: ${sourcePath} → ${destPath}`,
+        }],
+      };
+    },
+  );
 }
