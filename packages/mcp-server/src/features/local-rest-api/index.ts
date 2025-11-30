@@ -1334,4 +1334,302 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // FIND EMPTY NOTES - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_empty_notes"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "limit?": type("number").describe("Maximum results to return (default: 50)"),
+        "maxContentLength?": type("number").describe("Max content length to consider 'empty' (default: 50 chars)"),
+      },
+    }).describe(
+      "Find notes with no meaningful content - just frontmatter, whitespace, or minimal text.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 50;
+      const maxContentLength = args.maxContentLength ?? 50;
+
+      // Get all files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      type EmptyNote = {
+        path: string;
+        contentLength: number;
+        hasOnlyFrontmatter: boolean;
+        hasOnlyWhitespace: boolean;
+        hasOnlyTemplate: boolean;
+      };
+
+      const emptyNotes: EmptyNote[] = [];
+
+      for (const mdFile of mdFiles) {
+        try {
+          if (await isHidden(mdFile)) continue;
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(mdFile)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          // Strip frontmatter
+          const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n?/, "").trim();
+
+          // Check various "empty" conditions
+          const hasOnlyFrontmatter = content.match(/^---[\s\S]*?---\s*$/) !== null;
+          const hasOnlyWhitespace = contentWithoutFrontmatter.length === 0;
+          const hasOnlyTemplate = /^<%[^%]*%>\s*$/.test(contentWithoutFrontmatter);
+
+          const isEmpty = hasOnlyFrontmatter ||
+                          hasOnlyWhitespace ||
+                          hasOnlyTemplate ||
+                          contentWithoutFrontmatter.length <= maxContentLength;
+
+          if (isEmpty) {
+            emptyNotes.push({
+              path: mdFile,
+              contentLength: contentWithoutFrontmatter.length,
+              hasOnlyFrontmatter,
+              hasOnlyWhitespace,
+              hasOnlyTemplate,
+            });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Sort by content length (emptiest first)
+      emptyNotes.sort((a, b) => a.contentLength - b.contentLength);
+      const limitedNotes = emptyNotes.slice(0, limit);
+
+      // Categorize for summary
+      const onlyFrontmatter = emptyNotes.filter((n) => n.hasOnlyFrontmatter).length;
+      const onlyWhitespace = emptyNotes.filter((n) => n.hasOnlyWhitespace).length;
+      const onlyTemplate = emptyNotes.filter((n) => n.hasOnlyTemplate).length;
+
+      const result = {
+        totalNotesScanned: mdFiles.length,
+        emptyCount: emptyNotes.length,
+        breakdown: {
+          onlyFrontmatter,
+          onlyWhitespace,
+          onlyTemplate,
+          minimalContent: emptyNotes.length - onlyFrontmatter - onlyWhitespace - onlyTemplate,
+        },
+        threshold: maxContentLength,
+        emptyNotes: limitedNotes,
+        truncated: emptyNotes.length > limit,
+        hint: emptyNotes.length > 0
+          ? "Review these notes - add content or delete if unneeded"
+          : "No empty notes found!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // FIND DUPLICATE NOTES - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_duplicate_notes"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "method?": type('"filename" | "content" | "both"').describe("How to detect duplicates (default: both)"),
+        "limit?": type("number").describe("Maximum duplicate groups to return (default: 20)"),
+        "minSimilarity?": type("number").describe("Min similarity 0-100 for content matching (default: 100 = exact)"),
+      },
+    }).describe(
+      "Find duplicate notes by filename or content. Helps consolidate redundant notes.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 20;
+      const method = args.method ?? "both";
+      const minSimilarity = args.minSimilarity ?? 100;
+
+      // Get all files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      type DuplicateGroup = {
+        type: "filename" | "content";
+        key: string;
+        files: Array<{
+          path: string;
+          size: number;
+          mtime: number;
+        }>;
+      };
+
+      const duplicateGroups: DuplicateGroup[] = [];
+
+      // Find filename duplicates
+      if (method === "filename" || method === "both") {
+        const byFilename = new Map<string, string[]>();
+
+        for (const file of mdFiles) {
+          const filename = file.split("/").pop() || file;
+          const existing = byFilename.get(filename.toLowerCase()) || [];
+          existing.push(file);
+          byFilename.set(filename.toLowerCase(), existing);
+        }
+
+        for (const [filename, files] of byFilename) {
+          if (files.length > 1) {
+            const fileDetails = await Promise.all(
+              files.map(async (f) => {
+                try {
+                  const note = await makeRequest(
+                    LocalRestAPI.ApiNoteJson,
+                    `/vault/${encodeURIComponent(f)}`,
+                    { headers: { Accept: "application/vnd.olrapi.note+json" } },
+                  );
+                  return {
+                    path: f,
+                    size: note.stat?.size || 0,
+                    mtime: note.stat?.mtime || 0,
+                  };
+                } catch {
+                  return { path: f, size: 0, mtime: 0 };
+                }
+              })
+            );
+
+            duplicateGroups.push({
+              type: "filename",
+              key: filename,
+              files: fileDetails.sort((a, b) => b.mtime - a.mtime), // newest first
+            });
+          }
+        }
+      }
+
+      // Find content duplicates (exact match via hash)
+      if (method === "content" || method === "both") {
+        const byContentHash = new Map<string, string[]>();
+
+        // Simple hash function for content comparison
+        const simpleHash = (str: string): string => {
+          let hash = 0;
+          const normalized = str.replace(/^---[\s\S]*?---\n?/, "").trim().toLowerCase();
+          for (let i = 0; i < normalized.length; i++) {
+            const char = normalized.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+          }
+          return hash.toString(16);
+        };
+
+        for (const file of mdFiles) {
+          try {
+            if (await isHidden(file)) continue;
+
+            const content = await makeRequest(
+              LocalRestAPI.ApiContentResponse,
+              `/vault/${encodeURIComponent(file)}`,
+              { headers: { Accept: "text/markdown" } },
+            );
+
+            // Skip very short content (likely empty notes)
+            const cleanContent = content.replace(/^---[\s\S]*?---\n?/, "").trim();
+            if (cleanContent.length < 50) continue;
+
+            const hash = simpleHash(content);
+            const existing = byContentHash.get(hash) || [];
+            existing.push(file);
+            byContentHash.set(hash, existing);
+          } catch {
+            continue;
+          }
+        }
+
+        for (const [hash, files] of byContentHash) {
+          if (files.length > 1) {
+            // Verify they're not already in filename duplicates
+            const filenames = files.map((f) => (f.split("/").pop() || f).toLowerCase());
+            const allSameFilename = filenames.every((f) => f === filenames[0]);
+
+            // Skip if this is already captured by filename duplicates
+            if (method === "both" && allSameFilename) continue;
+
+            const fileDetails = await Promise.all(
+              files.map(async (f) => {
+                try {
+                  const note = await makeRequest(
+                    LocalRestAPI.ApiNoteJson,
+                    `/vault/${encodeURIComponent(f)}`,
+                    { headers: { Accept: "application/vnd.olrapi.note+json" } },
+                  );
+                  return {
+                    path: f,
+                    size: note.stat?.size || 0,
+                    mtime: note.stat?.mtime || 0,
+                  };
+                } catch {
+                  return { path: f, size: 0, mtime: 0 };
+                }
+              })
+            );
+
+            duplicateGroups.push({
+              type: "content",
+              key: `content-hash-${hash}`,
+              files: fileDetails.sort((a, b) => b.mtime - a.mtime),
+            });
+          }
+        }
+      }
+
+      // Sort by number of duplicates (most dupes first) and apply limit
+      duplicateGroups.sort((a, b) => b.files.length - a.files.length);
+      const limitedGroups = duplicateGroups.slice(0, limit);
+
+      // Calculate totals
+      const totalDuplicateFiles = duplicateGroups.reduce((sum, g) => sum + g.files.length - 1, 0);
+      const filenameGroups = duplicateGroups.filter((g) => g.type === "filename").length;
+      const contentGroups = duplicateGroups.filter((g) => g.type === "content").length;
+
+      const result = {
+        totalNotesScanned: mdFiles.length,
+        duplicateGroups: duplicateGroups.length,
+        totalDuplicateFiles,
+        byType: {
+          filenameDuplicates: filenameGroups,
+          contentDuplicates: contentGroups,
+        },
+        groups: limitedGroups,
+        truncated: duplicateGroups.length > limit,
+        hint: duplicateGroups.length > 0
+          ? "Review each group - keep the newest/largest and remove or merge others"
+          : "No duplicate notes found!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
 }

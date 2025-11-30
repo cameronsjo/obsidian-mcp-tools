@@ -29,12 +29,12 @@ Critical issues that block core functionality.
 | MCP authorization scopes | `idea` | High | Medium | [mcp-authorization-scopes.md](roadmap/mcp-authorization-scopes.md) - OAuth-style scopes (readonly, editor, full) per API key |
 | Tool-as-Code execution | `idea` | High | Medium | [tool-as-code.md](roadmap/tool-as-code.md) - Single `execute` tool for JavaScript code against vault API per [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) |
 | Delete by frontmatter query | `idea` | High | Medium | Delete files where frontmatter matches criteria (e.g., `subreddit: ["nsfw1", "nsfw2"]`) |
-| Find duplicate notes | `idea` | High | Medium | Detect dupes by filename/content/hash, suggest which to keep by size/date |
+| Find duplicate notes | `done` | High | Medium | `find_duplicate_notes` tool - detects dupes by filename/content hash |
 | Bulk move operations | `idea` | High | Medium | Move multiple files matching pattern to destination, with flatten option |
 | Bulk rename operations | `idea` | Medium | Medium | Rename files based on frontmatter or template pattern |
 | Find orphan attachments | `done` | Medium | Small | `find_orphan_attachments` tool - finds images/PDFs/etc not referenced by any note |
 | Find broken links | `done` | Medium | Small | `find_broken_links` tool - finds [[wikilinks]] pointing to non-existent files |
-| Find empty notes | `idea` | Low | Small | Find notes with no meaningful content (just frontmatter or template) |
+| Find empty notes | `done` | Low | Small | `find_empty_notes` tool - finds notes with only frontmatter/whitespace/template |
 | Find low value notes | `done` | Medium | Small | `find_low_value_notes` tool - scores notes by frontmatter, content, words, tags, links |
 | MCP resources for vault metadata | `idea` | High | Medium | Expose vault structure, recent files, and statistics as resources with dynamic URIs |
 | MCP sampling API for autonomous operations | `idea` | High | Large | Allow LLM to propose and execute multi-step vault operations |
