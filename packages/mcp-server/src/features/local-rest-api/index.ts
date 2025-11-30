@@ -1180,4 +1180,158 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // FIND BROKEN LINKS - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_broken_links"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "limit?": type("number").describe("Maximum results to return (default: 50)"),
+        "includeEmbeds?": type("boolean").describe("Include broken embeds ![[...]] (default: true)"),
+      },
+    }).describe(
+      "Find internal links [[...]] pointing to non-existent files. Helps fix dead links in your vault.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 50;
+      const includeEmbeds = args.includeEmbeds ?? true;
+
+      // Get all files in vault
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      // Build set of existing files (normalized for comparison)
+      const existingFiles = new Set<string>();
+      const existingFilesLower = new Set<string>();
+      for (const file of allFiles.files) {
+        existingFiles.add(file);
+        existingFilesLower.add(file.toLowerCase());
+        // Also add without extension for wiki-link matching
+        const noExt = file.replace(/\.[^.]+$/, "");
+        existingFiles.add(noExt);
+        existingFilesLower.add(noExt.toLowerCase());
+        // Add just filename without path
+        const filename = file.split("/").pop() || file;
+        const filenameNoExt = filename.replace(/\.[^.]+$/, "");
+        existingFiles.add(filename);
+        existingFilesLower.add(filename.toLowerCase());
+        existingFiles.add(filenameNoExt);
+        existingFilesLower.add(filenameNoExt.toLowerCase());
+      }
+
+      // Filter to markdown files
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      type BrokenLink = {
+        sourceFile: string;
+        link: string;
+        lineNumber?: number;
+        isEmbed: boolean;
+      };
+
+      const brokenLinks: BrokenLink[] = [];
+
+      for (const mdFile of mdFiles) {
+        try {
+          if (await isHidden(mdFile)) continue;
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(mdFile)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          const lines = content.split("\n");
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // Match wiki-links: [[target]] or [[target|alias]] or ![[embed]]
+            const wikiLinkRegex = /(!?)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
+            let match;
+
+            while ((match = wikiLinkRegex.exec(line)) !== null) {
+              const isEmbed = match[1] === "!";
+              const target = match[2].trim();
+
+              // Skip if we're not including embeds and this is an embed
+              if (isEmbed && !includeEmbeds) continue;
+
+              // Skip external links (http, https, etc.)
+              if (/^https?:\/\//.test(target)) continue;
+
+              // Skip block references and heading links within same file
+              if (target === "" || target.startsWith("#")) continue;
+
+              // Check if target exists
+              const targetLower = target.toLowerCase();
+              const targetWithMd = target.endsWith(".md") ? target : `${target}.md`;
+              const targetWithMdLower = targetWithMd.toLowerCase();
+
+              const exists =
+                existingFiles.has(target) ||
+                existingFilesLower.has(targetLower) ||
+                existingFiles.has(targetWithMd) ||
+                existingFilesLower.has(targetWithMdLower);
+
+              if (!exists) {
+                brokenLinks.push({
+                  sourceFile: mdFile,
+                  link: target,
+                  lineNumber: i + 1,
+                  isEmbed,
+                });
+              }
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Sort by source file and apply limit
+      brokenLinks.sort((a, b) => {
+        const fileCompare = a.sourceFile.localeCompare(b.sourceFile);
+        if (fileCompare !== 0) return fileCompare;
+        return (a.lineNumber || 0) - (b.lineNumber || 0);
+      });
+
+      const limitedLinks = brokenLinks.slice(0, limit);
+
+      // Group by source file for summary
+      const bySourceFile: Record<string, number> = {};
+      for (const link of brokenLinks) {
+        bySourceFile[link.sourceFile] = (bySourceFile[link.sourceFile] || 0) + 1;
+      }
+
+      // Count embeds vs links
+      const embedCount = brokenLinks.filter((l) => l.isEmbed).length;
+      const linkCount = brokenLinks.length - embedCount;
+
+      const result = {
+        totalMarkdownFiles: mdFiles.length,
+        brokenLinkCount: brokenLinks.length,
+        brokenEmbedCount: embedCount,
+        brokenWikilinkCount: linkCount,
+        filesWithBrokenLinks: Object.keys(bySourceFile).length,
+        brokenLinks: limitedLinks,
+        truncated: brokenLinks.length > limit,
+        hint: brokenLinks.length > 0
+          ? "Create missing notes or update links to fix these references"
+          : "No broken links found - your vault links are healthy!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
 }
