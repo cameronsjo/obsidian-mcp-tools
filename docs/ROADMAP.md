@@ -11,11 +11,27 @@ Project roadmap for MCP Tools for Obsidian.
 | `in-progress` | Actively being worked on |
 | `done` | Completed |
 
+## P0 - Bugs & Blockers
+
+Critical issues that block core functionality.
+
+| Item | Status | Impact | Effort | Details |
+|------|--------|--------|--------|---------|
+| Special character handling in delete | `planned` | High | Medium | `obsidian_delete_note` fails on apostrophes, commas, emoji, curly quotes - path resolution bug |
+| Add `move_note` tool | `planned` | High | Small | Can't move files at all - core missing functionality |
+| Bulk delete operations | `planned` | High | Medium | [bulk-delete.md](roadmap/bulk-delete.md) - one-by-one deletion unusable at scale |
+
 ## Features
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
-| Bulk delete operations | `idea` | High | Medium | [bulk-delete.md](roadmap/bulk-delete.md) |
+| Delete by frontmatter query | `idea` | High | Medium | Delete files where frontmatter matches criteria (e.g., `subreddit: ["nsfw1", "nsfw2"]`) |
+| Find duplicate notes | `idea` | High | Medium | Detect dupes by filename/content/hash, suggest which to keep by size/date |
+| Bulk move operations | `idea` | High | Medium | Move multiple files matching pattern to destination, with flatten option |
+| Bulk rename operations | `idea` | Medium | Medium | Rename files based on frontmatter or template pattern |
+| Find orphan attachments | `idea` | Medium | Small | Vault hygiene - find attachments not referenced by any note |
+| Find broken links | `idea` | Medium | Small | Vault hygiene - find internal links pointing to non-existent files |
+| Find empty notes | `idea` | Low | Small | Find notes with no meaningful content (just frontmatter or template) |
 | MCP resources for vault metadata | `idea` | High | Medium | Expose vault structure, recent files, and statistics as resources with dynamic URIs |
 | MCP sampling API for autonomous operations | `idea` | High | Large | Allow LLM to propose and execute multi-step vault operations |
 | MCP tool result streaming | `idea` | Medium | Medium | Use progress notifications for long-running searches and bulk updates |
