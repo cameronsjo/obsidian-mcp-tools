@@ -6,6 +6,8 @@ import {
   assertNotReadonly,
   isHidden,
   MCP_TAGS,
+  SCOPES,
+  requireScopeInSession,
   type ToolRegistry,
 } from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -40,6 +42,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Returns the content of the currently active file in Obsidian. Can return either markdown content or a JSON representation including parsed tags and frontmatter.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_READ);
+
       const format =
         args?.format === "json"
           ? "application/vnd.olrapi.note+json"
@@ -66,6 +70,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Update the content of the active file open in Obsidian. Respects mcp-readonly tag."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_WRITE);
+
       // Check if active file is readonly
       const activeFile = await makeRequest(
         LocalRestAPI.ApiNoteJson,
@@ -101,6 +107,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Append content to the end of the currently-open note. Respects mcp-readonly tag."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_WRITE);
+
       // Check if active file is readonly
       const activeFile = await makeRequest(
         LocalRestAPI.ApiNoteJson,
@@ -136,6 +144,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Insert or modify content in the currently-open note relative to a heading, block reference, or frontmatter field. Respects mcp-readonly tag.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_WRITE);
+
       // Check if active file is readonly
       const activeFile = await makeRequest(
         LocalRestAPI.ApiNoteJson,
@@ -194,6 +204,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       arguments: "Record<string, unknown>",
     }).describe("Delete the currently-active file in Obsidian. Respects mcp-protected tag."),
     async () => {
+      requireScopeInSession(SCOPES.VAULT_DELETE);
+
       // Check if active file is protected
       const activeFile = await makeRequest(
         LocalRestAPI.ApiNoteJson,
@@ -231,6 +243,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Open a document in the Obsidian UI. Creates a new document if it doesn't exist. Returns a confirmation if the file was opened successfully.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.PLUGINS_EXECUTE);
+
       const validPath = validateVaultPath(args.filename);
       const query = args.newLeaf ? "?newLeaf=true" : "";
 
@@ -260,6 +274,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Search for documents matching a specified query using either Dataview DQL or JsonLogic.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_SEARCH);
+
       const contentType =
         args.queryType === "dataview"
           ? "application/vnd.olrapi.dataview.dql+txt"
@@ -291,6 +307,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Search for documents matching a text query."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_SEARCH);
+
       const query = new URLSearchParams({
         query: args.query,
         ...(args.contextLength
@@ -325,6 +343,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "List files in the root directory or a specified subdirectory of your vault.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_LIST);
+
       const validPath = validateOptionalPath(args.directory);
       const path = validPath ? `${validPath}/` : "";
       const data = await makeRequest(
@@ -349,6 +369,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Get the content of a file from your vault."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_READ);
+
       const validPath = validateVaultPath(args.filename);
       const isJson = args.format === "json";
       const format = isJson
@@ -383,6 +405,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Create a new file in your vault or update an existing one. Respects mcp-readonly tag for existing files."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_WRITE);
+
       const validPath = validateVaultPath(args.filename);
 
       // Check if existing file is readonly (new files are fine)
@@ -425,6 +449,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Append content to a new or existing file. Respects mcp-readonly tag."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_WRITE);
+
       const validPath = validateVaultPath(args.filename);
 
       // Check if file is readonly (if it exists)
@@ -467,6 +493,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Insert or modify content in a file relative to a heading, block reference, or frontmatter field. Respects mcp-readonly tag.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_WRITE);
+
       const validPath = validateVaultPath(args.filename);
 
       // Check if file is readonly
@@ -517,6 +545,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       },
     }).describe("Delete a file from your vault. Respects mcp-protected tag."),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_DELETE);
+
       const validPath = validateVaultPath(args.filename);
 
       // Check if file is protected
@@ -548,6 +578,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Move a file from one location to another in your vault. Respects mcp-protected tag.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_MOVE);
+
       const sourcePath = validateVaultPath(args.source);
       const destPath = validateVaultPath(args.destination);
 
@@ -622,6 +654,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Rename a file in your vault, keeping it in the same directory. Respects mcp-protected tag.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_MOVE);
+
       const sourcePath = validateVaultPath(args.filename);
 
       // Check if file is protected
@@ -683,6 +717,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Delete multiple vault files matching a glob pattern, regex, or search query. Defaults to dry-run mode for safety.",
     ),
     async ({ arguments: args }) => {
+      requireScopeInSession(SCOPES.VAULT_DELETE);
+
       const matchType = args.type ?? "glob";
       const limit = args.limit ?? 100;
       const dryRun = args.dryRun ?? true;

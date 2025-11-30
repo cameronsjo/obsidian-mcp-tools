@@ -1,3 +1,4 @@
+export * from "../auth/scopes";
 export * from "./formatMcpError";
 export * from "./formatString";
 export * from "./logger";
