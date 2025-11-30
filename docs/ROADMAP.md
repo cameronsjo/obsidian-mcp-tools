@@ -76,7 +76,7 @@ Critical issues that block core functionality.
 | Add Justfile with common tasks | `done` | High | Small | Single command for setup, dev, check, test, release with <1s task discovery |
 | Implement lefthook pre-commit hooks | `done` | High | Small | Parallel lint/typecheck/test execution to catch issues before commit |
 | Create comprehensive test suite | `idea` | High | Large | >70% coverage goal for mcp-server and obsidian-plugin packages |
-| Add .claude/commands for workflows | `idea` | Medium | Small | Commands for setup, check, ready, and test to streamline Claude Code workflows |
+| Add .claude/commands for workflows | `done` | Medium | Small | `/setup`, `/check`, `/test`, `/ready` commands for Claude Code workflows |
 | Add CI workflow for PR validation | `idea` | High | Medium | Lint, typecheck, test, build validation to catch issues before merge |
 | Create automated setup script | `idea` | High | Medium | Achieve <5min clone-to-running for new contributors |
 | Add plugin linking/debugging docs | `idea` | Medium | Small | Step-by-step local development workflow documentation |
