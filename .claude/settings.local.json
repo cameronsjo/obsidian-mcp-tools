@@ -4,7 +4,10 @@
       "SlashCommand(/roadmap.add:*)",
       "Bash(~/.bun/bin/bun test:*)",
       "Bash(~/.bun/bin/bun install:*)",
-      "Bash(~/.bun/bin/bun run:*)"
+      "Bash(~/.bun/bin/bun run:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(~/.bun/bin/bun add:*)",
+      "Bash(~/.bun/bin/bun:*)"
     ],
     "deny": [],
     "ask": []
