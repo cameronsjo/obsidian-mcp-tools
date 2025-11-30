@@ -27,7 +27,7 @@ Critical issues that block core functionality.
 |------|--------|--------|--------|---------|
 | Unified tool dispatch with dynamic plugin detection | `idea` | High | Large | [unified-tool-dispatch.md](roadmap/unified-tool-dispatch.md) - Reduce 21+ tools to ~5 dispatchers with dictionary-style operation lookup |
 | MCP authorization scopes | `done` | High | Medium | [mcp-authorization-scopes.md](roadmap/mcp-authorization-scopes.md) - OAuth-style scopes (readonly, editor, full) via OBSIDIAN_MCP_SCOPES env var |
-| Tool-as-Code execution | `idea` | High | Medium | [tool-as-code.md](roadmap/tool-as-code.md) - Single `execute` tool for JavaScript code against vault API per [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) |
+| Tool-as-Code execution | `in-progress` | High | Medium | [tool-as-code.md](roadmap/tool-as-code.md) - Single `execute` tool for JavaScript code against vault API per [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) |
 | Delete by frontmatter query | `done` | High | Medium | `delete_by_frontmatter` tool - delete files where frontmatter matches criteria |
 | Find duplicate notes | `done` | High | Medium | `find_duplicate_notes` tool - detect dupes by filename/content hash |
 | Bulk move operations | `done` | High | Medium | `bulk_move_files` tool - move multiple files with flatten option |
