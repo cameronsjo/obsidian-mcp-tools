@@ -180,7 +180,13 @@ If you suspect unauthorized access:
 
 ## Summary
 
-This tool is powerful and useful, but it's essentially a `cat * | nc -l 27123` for your brain. Treat it with appropriate caution.
+This tool is powerful and useful, but it's essentially **leaving your diary open on a park bench with a "please don't read" sign**. The sign might deter some people, but it's not a lock.
+
+When configured incorrectly, anyone on your network (or worse, the internet) can:
+
+- **Read** everything you've ever written
+- **Modify** your notes without you knowing
+- **Delete** your entire knowledge base
 
 ```
 ┌────────────────────────────────────────────┐
