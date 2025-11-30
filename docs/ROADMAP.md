@@ -17,9 +17,9 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
-| Special character handling in delete | `planned` | High | Medium | `obsidian_delete_note` fails on apostrophes, commas, emoji, curly quotes - path resolution bug |
-| Add `move_note` tool | `planned` | High | Small | Can't move files at all - core missing functionality |
-| Bulk delete operations | `planned` | High | Medium | [bulk-delete.md](roadmap/bulk-delete.md) - one-by-one deletion unusable at scale |
+| Special character handling in delete | `planned` | High | Medium | `obsidian_delete_note` fails on apostrophes, commas, emoji, curly quotes - path resolution bug (in cyanheads/obsidian-mcp-server, not this project) |
+| Add `move_note` tool | `done` | High | Small | `move_vault_file` and `rename_vault_file` tools added |
+| Bulk delete operations | `done` | High | Medium | `bulk_delete_by_pattern`, `bulk_delete_by_regex`, `bulk_delete_by_query` tools added with dry-run safety |
 
 ## Features
 

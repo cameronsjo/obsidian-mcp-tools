@@ -4,7 +4,7 @@
 
 ## Status
 
-- **Status**: idea
+- **Status**: done
 - **Priority**: High
 - **Effort**: Medium
 
