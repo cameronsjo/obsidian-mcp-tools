@@ -17,6 +17,7 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
+| Response size optimization | `planned` | Critical | Medium | [response-size-optimization.md](roadmap/response-size-optimization.md) - Tools return 25k+ tokens, exhausting LLM context. Add pagination/limits to all data-returning tools |
 | Special character handling in delete | `planned` | High | Medium | `obsidian_delete_note` fails on apostrophes, commas, emoji, curly quotes - path resolution bug (in cyanheads/obsidian-mcp-server, not this project) |
 | Add `move_note` tool | `done` | High | Small | `move_vault_file` and `rename_vault_file` tools added |
 | Bulk delete operations | `done` | High | Medium | `bulk_delete_by_pattern`, `bulk_delete_by_regex`, `bulk_delete_by_query` tools added with dry-run safety |
@@ -25,16 +26,17 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
-| Unified tool dispatch with dynamic plugin detection | `idea` | High | Large | [unified-tool-dispatch.md](roadmap/unified-tool-dispatch.md) - Reduce 21+ tools to ~5 dispatchers with dictionary-style operation lookup |
+| Unified tool dispatch with dynamic plugin detection | `done` | High | Large | [unified-tool-dispatch.md](roadmap/unified-tool-dispatch.md) - Reduces 21+ tools to 4 dispatchers (vault, active_file, plugin, discover) with configurable behavior |
 | MCP authorization scopes | `idea` | High | Medium | [mcp-authorization-scopes.md](roadmap/mcp-authorization-scopes.md) - OAuth-style scopes (readonly, editor, full) per API key |
 | Tool-as-Code execution | `idea` | High | Medium | [tool-as-code.md](roadmap/tool-as-code.md) - Single `execute` tool for JavaScript code against vault API per [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) |
-| Delete by frontmatter query | `idea` | High | Medium | Delete files where frontmatter matches criteria (e.g., `subreddit: ["nsfw1", "nsfw2"]`) |
-| Find duplicate notes | `idea` | High | Medium | Detect dupes by filename/content/hash, suggest which to keep by size/date |
-| Bulk move operations | `idea` | High | Medium | Move multiple files matching pattern to destination, with flatten option |
-| Bulk rename operations | `idea` | Medium | Medium | Rename files based on frontmatter or template pattern |
-| Find orphan attachments | `idea` | Medium | Small | Vault hygiene - find attachments not referenced by any note |
-| Find broken links | `idea` | Medium | Small | Vault hygiene - find internal links pointing to non-existent files |
-| Find empty notes | `idea` | Low | Small | Find notes with no meaningful content (just frontmatter or template) |
+| Delete by frontmatter query | `done` | High | Medium | `delete_by_frontmatter` tool - delete files by field value with operators (equals, contains, regex, etc.) |
+| Find duplicate notes | `done` | High | Medium | `find_duplicate_notes` tool - detects dupes by filename/content hash |
+| Bulk move operations | `done` | High | Medium | `bulk_move_files` tool - move files by glob/regex/search to destination with flatten option |
+| Bulk rename operations | `done` | Medium | Medium | `bulk_rename_files` tool - rename by template with {frontmatter.field}, prefix/suffix, or regex replace |
+| Find orphan attachments | `done` | Medium | Small | `find_orphan_attachments` tool - finds images/PDFs/etc not referenced by any note |
+| Find broken links | `done` | Medium | Small | `find_broken_links` tool - finds [[wikilinks]] pointing to non-existent files |
+| Find empty notes | `done` | Low | Small | `find_empty_notes` tool - finds notes with only frontmatter/whitespace/template |
+| Find low value notes | `done` | Medium | Small | `find_low_value_notes` tool - scores notes by frontmatter, content, words, tags, links |
 | MCP resources for vault metadata | `idea` | High | Medium | Expose vault structure, recent files, and statistics as resources with dynamic URIs |
 | MCP sampling API for autonomous operations | `idea` | High | Large | Allow LLM to propose and execute multi-step vault operations |
 | MCP tool result streaming | `idea` | Medium | Medium | Use progress notifications for long-running searches and bulk updates |
@@ -43,6 +45,9 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
+| Load testing infrastructure | `idea` | High | Medium | [load-testing.md](roadmap/load-testing.md) - Benchmarks, test vault generator, performance budgets, CI regression detection |
+| Response streaming for large results | `idea` | Medium | Medium | Stream responses for large file reads and search results to reduce memory pressure |
+| Caching layer for repeated queries | `idea` | Medium | Medium | LRU cache for file metadata, search results, plugin status checks |
 
 ## Technical Debt
 
@@ -75,7 +80,7 @@ Critical issues that block core functionality.
 | Add Justfile with common tasks | `done` | High | Small | Single command for setup, dev, check, test, release with <1s task discovery |
 | Implement lefthook pre-commit hooks | `done` | High | Small | Parallel lint/typecheck/test execution to catch issues before commit |
 | Create comprehensive test suite | `idea` | High | Large | >70% coverage goal for mcp-server and obsidian-plugin packages |
-| Add .claude/commands for workflows | `idea` | Medium | Small | Commands for setup, check, ready, and test to streamline Claude Code workflows |
+| Add .claude/commands for workflows | `done` | Medium | Small | `/setup`, `/check`, `/test`, `/ready` commands for Claude Code workflows |
 | Add CI workflow for PR validation | `idea` | High | Medium | Lint, typecheck, test, build validation to catch issues before merge |
 | Create automated setup script | `idea` | High | Medium | Achieve <5min clone-to-running for new contributors |
 | Add plugin linking/debugging docs | `idea` | Medium | Small | Step-by-step local development workflow documentation |

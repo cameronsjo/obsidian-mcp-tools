@@ -851,4 +851,1366 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // FIND LOW VALUE NOTES - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_low_value_notes"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "limit?": type("number").describe("Maximum notes to return (default: 20)"),
+        "minScore?": type("number").describe("Only return notes with score below this threshold (default: 50)"),
+        "includeDetails?": type("boolean").describe("Include detailed scoring breakdown (default: false)"),
+      },
+    }).describe(
+      "Find notes that may need attention: minimal frontmatter, sparse content, no links. Returns notes sorted by 'value score' (lower = less rich).",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 20;
+      const minScore = args.minScore ?? 50;
+      const includeDetails = args.includeDetails ?? false;
+
+      // Get all markdown files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      // Filter to markdown files only
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      // Score each note
+      type NoteScore = {
+        path: string;
+        score: number;
+        details?: {
+          frontmatterFields: number;
+          frontmatterScore: number;
+          contentLength: number;
+          contentScore: number;
+          wordCount: number;
+          wordScore: number;
+          tagCount: number;
+          tagScore: number;
+          linkCount: number;
+          linkScore: number;
+          hasTitle: boolean;
+          titleScore: number;
+        };
+      };
+
+      const scores: NoteScore[] = [];
+
+      for (const filePath of mdFiles) {
+        try {
+          // Skip hidden files
+          if (await isHidden(filePath)) continue;
+
+          // Fetch note metadata
+          const note = await makeRequest(
+            LocalRestAPI.ApiNoteJson,
+            `/vault/${encodeURIComponent(filePath)}`,
+            { headers: { Accept: "application/vnd.olrapi.note+json" } },
+          );
+
+          // Calculate scoring components
+          const frontmatterFields = Object.keys(note.frontmatter || {}).length;
+          const content = note.content || "";
+
+          // Strip frontmatter from content for analysis
+          const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n?/, "").trim();
+          const contentLength = contentWithoutFrontmatter.length;
+          const wordCount = contentWithoutFrontmatter.split(/\s+/).filter((w: string) => w.length > 0).length;
+
+          // Count internal links [[...]]
+          const linkMatches = contentWithoutFrontmatter.match(/\[\[([^\]]+)\]\]/g);
+          const linkCount = linkMatches ? linkMatches.length : 0;
+
+          // Tag count
+          const tagCount = (note.tags || []).length;
+
+          // Check if note has a title (first heading or filename-based)
+          const hasTitle = /^#\s+.+/m.test(contentWithoutFrontmatter) || frontmatterFields > 0;
+
+          // Calculate component scores (each 0-20, total max 100)
+          const frontmatterScore = Math.min(frontmatterFields * 4, 20); // 5 fields = max
+          const contentScore = Math.min(Math.floor(contentLength / 50), 20); // 1000 chars = max
+          const wordScore = Math.min(Math.floor(wordCount / 10), 20); // 200 words = max
+          const tagScore = Math.min(tagCount * 5, 20); // 4 tags = max
+          const linkScore = Math.min(linkCount * 4, 20); // 5 links = max
+
+          const totalScore = frontmatterScore + contentScore + wordScore + tagScore + linkScore;
+
+          const scoreEntry: NoteScore = {
+            path: filePath,
+            score: totalScore,
+          };
+
+          if (includeDetails) {
+            scoreEntry.details = {
+              frontmatterFields,
+              frontmatterScore,
+              contentLength,
+              contentScore,
+              wordCount,
+              wordScore,
+              tagCount,
+              tagScore,
+              linkCount,
+              linkScore,
+              hasTitle,
+              titleScore: hasTitle ? 0 : -10, // Penalty shown but not applied to keep max at 100
+            };
+          }
+
+          scores.push(scoreEntry);
+        } catch {
+          // Skip files that can't be read (binary, etc.)
+          continue;
+        }
+      }
+
+      // Sort by score ascending (lowest value first)
+      scores.sort((a, b) => a.score - b.score);
+
+      // Filter to notes below threshold and apply limit
+      const lowValueNotes = scores
+        .filter((n) => n.score < minScore)
+        .slice(0, limit);
+
+      const result = {
+        totalNotesScanned: mdFiles.length,
+        notesAnalyzed: scores.length,
+        lowValueCount: scores.filter((n) => n.score < minScore).length,
+        threshold: minScore,
+        notes: lowValueNotes,
+        scoringGuide: {
+          max: 100,
+          components: {
+            frontmatter: "0-20 (4 pts per field, max 5 fields)",
+            content: "0-20 (1 pt per 50 chars, max 1000 chars)",
+            words: "0-20 (1 pt per 10 words, max 200 words)",
+            tags: "0-20 (5 pts per tag, max 4 tags)",
+            links: "0-20 (4 pts per [[link]], max 5 links)",
+          },
+        },
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // FIND ORPHAN ATTACHMENTS - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_orphan_attachments"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "extensions?": type("string[]").describe("File extensions to check (default: common image/doc types)"),
+        "limit?": type("number").describe("Maximum results to return (default: 50)"),
+      },
+    }).describe(
+      "Find attachment files (images, PDFs, etc.) not referenced by any note. Helps reclaim space from unused files.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 50;
+      const defaultExtensions = [
+        // Images
+        "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
+        // Documents
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        // Media
+        "mp3", "mp4", "wav", "webm", "ogg", "m4a",
+        // Archives
+        "zip", "rar", "7z", "tar", "gz",
+        // Other
+        "json", "csv", "xml",
+      ];
+      const extensions = args.extensions ?? defaultExtensions;
+      const extSet = new Set(extensions.map((e: string) => e.toLowerCase()));
+
+      // Get all files in vault
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      // Separate markdown files and potential attachments
+      const mdFiles: string[] = [];
+      const attachments: string[] = [];
+
+      for (const file of allFiles.files) {
+        if (file.endsWith(".md")) {
+          mdFiles.push(file);
+        } else {
+          const ext = file.split(".").pop()?.toLowerCase();
+          if (ext && extSet.has(ext)) {
+            attachments.push(file);
+          }
+        }
+      }
+
+      // Build a set of all referenced files from markdown content
+      const referencedFiles = new Set<string>();
+
+      for (const mdFile of mdFiles) {
+        try {
+          // Skip hidden files
+          if (await isHidden(mdFile)) continue;
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(mdFile)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          // Extract all potential file references
+          // Obsidian wiki-style: ![[file.png]] or [[file.pdf]]
+          const wikiLinks = content.match(/!?\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g) || [];
+          for (const link of wikiLinks) {
+            const match = link.match(/!?\[\[([^\]|]+)/);
+            if (match) {
+              const ref = match[1].trim();
+              // Add both the reference as-is and with common variations
+              referencedFiles.add(ref);
+              referencedFiles.add(ref.toLowerCase());
+              // Handle references without extension
+              for (const ext of extensions) {
+                referencedFiles.add(`${ref}.${ext}`);
+                referencedFiles.add(`${ref}.${ext}`.toLowerCase());
+              }
+            }
+          }
+
+          // Standard markdown: ![alt](path) or [text](path)
+          const mdLinks = content.match(/!?\[[^\]]*\]\(([^)]+)\)/g) || [];
+          for (const link of mdLinks) {
+            const match = link.match(/!?\[[^\]]*\]\(([^)]+)\)/);
+            if (match) {
+              let ref = match[1].trim();
+              // Remove URL encoding and query strings
+              ref = decodeURIComponent(ref.split("?")[0].split("#")[0]);
+              referencedFiles.add(ref);
+              referencedFiles.add(ref.toLowerCase());
+            }
+          }
+
+          // HTML img tags: <img src="path">
+          const imgTags = content.match(/<img[^>]+src=["']([^"']+)["']/gi) || [];
+          for (const tag of imgTags) {
+            const match = tag.match(/src=["']([^"']+)["']/i);
+            if (match) {
+              const ref = match[1].trim();
+              referencedFiles.add(ref);
+              referencedFiles.add(ref.toLowerCase());
+            }
+          }
+        } catch {
+          // Skip files that can't be read
+          continue;
+        }
+      }
+
+      // Find orphan attachments (not referenced anywhere)
+      const orphans: Array<{ path: string; extension: string; size?: number }> = [];
+
+      for (const attachment of attachments) {
+        try {
+          if (await isHidden(attachment)) continue;
+
+          // Check if this attachment is referenced
+          const filename = attachment.split("/").pop() || attachment;
+          const filenameNoExt = filename.replace(/\.[^.]+$/, "");
+          const attachmentLower = attachment.toLowerCase();
+          const filenameLower = filename.toLowerCase();
+
+          const isReferenced =
+            referencedFiles.has(attachment) ||
+            referencedFiles.has(attachmentLower) ||
+            referencedFiles.has(filename) ||
+            referencedFiles.has(filenameLower) ||
+            referencedFiles.has(filenameNoExt) ||
+            referencedFiles.has(filenameNoExt.toLowerCase());
+
+          if (!isReferenced) {
+            const ext = attachment.split(".").pop()?.toLowerCase() || "";
+            orphans.push({ path: attachment, extension: ext });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Sort by path and apply limit
+      orphans.sort((a, b) => a.path.localeCompare(b.path));
+      const limitedOrphans = orphans.slice(0, limit);
+
+      // Group by extension for summary
+      const byExtension: Record<string, number> = {};
+      for (const orphan of orphans) {
+        byExtension[orphan.extension] = (byExtension[orphan.extension] || 0) + 1;
+      }
+
+      const result = {
+        totalAttachmentsScanned: attachments.length,
+        totalMarkdownFiles: mdFiles.length,
+        orphanCount: orphans.length,
+        byExtension,
+        orphans: limitedOrphans,
+        truncated: orphans.length > limit,
+        hint: orphans.length > 0
+          ? "Review these files and delete unused ones with bulk_delete_files tool"
+          : "No orphan attachments found - your vault is clean!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // FIND BROKEN LINKS - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_broken_links"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "limit?": type("number").describe("Maximum results to return (default: 50)"),
+        "includeEmbeds?": type("boolean").describe("Include broken embeds ![[...]] (default: true)"),
+      },
+    }).describe(
+      "Find internal links [[...]] pointing to non-existent files. Helps fix dead links in your vault.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 50;
+      const includeEmbeds = args.includeEmbeds ?? true;
+
+      // Get all files in vault
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      // Build set of existing files (normalized for comparison)
+      const existingFiles = new Set<string>();
+      const existingFilesLower = new Set<string>();
+      for (const file of allFiles.files) {
+        existingFiles.add(file);
+        existingFilesLower.add(file.toLowerCase());
+        // Also add without extension for wiki-link matching
+        const noExt = file.replace(/\.[^.]+$/, "");
+        existingFiles.add(noExt);
+        existingFilesLower.add(noExt.toLowerCase());
+        // Add just filename without path
+        const filename = file.split("/").pop() || file;
+        const filenameNoExt = filename.replace(/\.[^.]+$/, "");
+        existingFiles.add(filename);
+        existingFilesLower.add(filename.toLowerCase());
+        existingFiles.add(filenameNoExt);
+        existingFilesLower.add(filenameNoExt.toLowerCase());
+      }
+
+      // Filter to markdown files
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      type BrokenLink = {
+        sourceFile: string;
+        link: string;
+        lineNumber?: number;
+        isEmbed: boolean;
+      };
+
+      const brokenLinks: BrokenLink[] = [];
+
+      for (const mdFile of mdFiles) {
+        try {
+          if (await isHidden(mdFile)) continue;
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(mdFile)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          const lines = content.split("\n");
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            // Match wiki-links: [[target]] or [[target|alias]] or ![[embed]]
+            const wikiLinkRegex = /(!?)\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g;
+            let match;
+
+            while ((match = wikiLinkRegex.exec(line)) !== null) {
+              const isEmbed = match[1] === "!";
+              const target = match[2].trim();
+
+              // Skip if we're not including embeds and this is an embed
+              if (isEmbed && !includeEmbeds) continue;
+
+              // Skip external links (http, https, etc.)
+              if (/^https?:\/\//.test(target)) continue;
+
+              // Skip block references and heading links within same file
+              if (target === "" || target.startsWith("#")) continue;
+
+              // Check if target exists
+              const targetLower = target.toLowerCase();
+              const targetWithMd = target.endsWith(".md") ? target : `${target}.md`;
+              const targetWithMdLower = targetWithMd.toLowerCase();
+
+              const exists =
+                existingFiles.has(target) ||
+                existingFilesLower.has(targetLower) ||
+                existingFiles.has(targetWithMd) ||
+                existingFilesLower.has(targetWithMdLower);
+
+              if (!exists) {
+                brokenLinks.push({
+                  sourceFile: mdFile,
+                  link: target,
+                  lineNumber: i + 1,
+                  isEmbed,
+                });
+              }
+            }
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Sort by source file and apply limit
+      brokenLinks.sort((a, b) => {
+        const fileCompare = a.sourceFile.localeCompare(b.sourceFile);
+        if (fileCompare !== 0) return fileCompare;
+        return (a.lineNumber || 0) - (b.lineNumber || 0);
+      });
+
+      const limitedLinks = brokenLinks.slice(0, limit);
+
+      // Group by source file for summary
+      const bySourceFile: Record<string, number> = {};
+      for (const link of brokenLinks) {
+        bySourceFile[link.sourceFile] = (bySourceFile[link.sourceFile] || 0) + 1;
+      }
+
+      // Count embeds vs links
+      const embedCount = brokenLinks.filter((l) => l.isEmbed).length;
+      const linkCount = brokenLinks.length - embedCount;
+
+      const result = {
+        totalMarkdownFiles: mdFiles.length,
+        brokenLinkCount: brokenLinks.length,
+        brokenEmbedCount: embedCount,
+        brokenWikilinkCount: linkCount,
+        filesWithBrokenLinks: Object.keys(bySourceFile).length,
+        brokenLinks: limitedLinks,
+        truncated: brokenLinks.length > limit,
+        hint: brokenLinks.length > 0
+          ? "Create missing notes or update links to fix these references"
+          : "No broken links found - your vault links are healthy!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // FIND EMPTY NOTES - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_empty_notes"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "limit?": type("number").describe("Maximum results to return (default: 50)"),
+        "maxContentLength?": type("number").describe("Max content length to consider 'empty' (default: 50 chars)"),
+      },
+    }).describe(
+      "Find notes with no meaningful content - just frontmatter, whitespace, or minimal text.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 50;
+      const maxContentLength = args.maxContentLength ?? 50;
+
+      // Get all files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      type EmptyNote = {
+        path: string;
+        contentLength: number;
+        hasOnlyFrontmatter: boolean;
+        hasOnlyWhitespace: boolean;
+        hasOnlyTemplate: boolean;
+      };
+
+      const emptyNotes: EmptyNote[] = [];
+
+      for (const mdFile of mdFiles) {
+        try {
+          if (await isHidden(mdFile)) continue;
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(mdFile)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          // Strip frontmatter
+          const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n?/, "").trim();
+
+          // Check various "empty" conditions
+          const hasOnlyFrontmatter = content.match(/^---[\s\S]*?---\s*$/) !== null;
+          const hasOnlyWhitespace = contentWithoutFrontmatter.length === 0;
+          const hasOnlyTemplate = /^<%[^%]*%>\s*$/.test(contentWithoutFrontmatter);
+
+          const isEmpty = hasOnlyFrontmatter ||
+                          hasOnlyWhitespace ||
+                          hasOnlyTemplate ||
+                          contentWithoutFrontmatter.length <= maxContentLength;
+
+          if (isEmpty) {
+            emptyNotes.push({
+              path: mdFile,
+              contentLength: contentWithoutFrontmatter.length,
+              hasOnlyFrontmatter,
+              hasOnlyWhitespace,
+              hasOnlyTemplate,
+            });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Sort by content length (emptiest first)
+      emptyNotes.sort((a, b) => a.contentLength - b.contentLength);
+      const limitedNotes = emptyNotes.slice(0, limit);
+
+      // Categorize for summary
+      const onlyFrontmatter = emptyNotes.filter((n) => n.hasOnlyFrontmatter).length;
+      const onlyWhitespace = emptyNotes.filter((n) => n.hasOnlyWhitespace).length;
+      const onlyTemplate = emptyNotes.filter((n) => n.hasOnlyTemplate).length;
+
+      const result = {
+        totalNotesScanned: mdFiles.length,
+        emptyCount: emptyNotes.length,
+        breakdown: {
+          onlyFrontmatter,
+          onlyWhitespace,
+          onlyTemplate,
+          minimalContent: emptyNotes.length - onlyFrontmatter - onlyWhitespace - onlyTemplate,
+        },
+        threshold: maxContentLength,
+        emptyNotes: limitedNotes,
+        truncated: emptyNotes.length > limit,
+        hint: emptyNotes.length > 0
+          ? "Review these notes - add content or delete if unneeded"
+          : "No empty notes found!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // FIND DUPLICATE NOTES - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_duplicate_notes"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "method?": type('"filename" | "content" | "both"').describe("How to detect duplicates (default: both)"),
+        "limit?": type("number").describe("Maximum duplicate groups to return (default: 20)"),
+        "minSimilarity?": type("number").describe("Min similarity 0-100 for content matching (default: 100 = exact)"),
+      },
+    }).describe(
+      "Find duplicate notes by filename or content. Helps consolidate redundant notes.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 20;
+      const method = args.method ?? "both";
+      const minSimilarity = args.minSimilarity ?? 100;
+
+      // Get all files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      type DuplicateGroup = {
+        type: "filename" | "content";
+        key: string;
+        files: Array<{
+          path: string;
+          size: number;
+          mtime: number;
+        }>;
+      };
+
+      const duplicateGroups: DuplicateGroup[] = [];
+
+      // Find filename duplicates
+      if (method === "filename" || method === "both") {
+        const byFilename = new Map<string, string[]>();
+
+        for (const file of mdFiles) {
+          const filename = file.split("/").pop() || file;
+          const existing = byFilename.get(filename.toLowerCase()) || [];
+          existing.push(file);
+          byFilename.set(filename.toLowerCase(), existing);
+        }
+
+        for (const [filename, files] of byFilename) {
+          if (files.length > 1) {
+            const fileDetails = await Promise.all(
+              files.map(async (f) => {
+                try {
+                  const note = await makeRequest(
+                    LocalRestAPI.ApiNoteJson,
+                    `/vault/${encodeURIComponent(f)}`,
+                    { headers: { Accept: "application/vnd.olrapi.note+json" } },
+                  );
+                  return {
+                    path: f,
+                    size: note.stat?.size || 0,
+                    mtime: note.stat?.mtime || 0,
+                  };
+                } catch {
+                  return { path: f, size: 0, mtime: 0 };
+                }
+              })
+            );
+
+            duplicateGroups.push({
+              type: "filename",
+              key: filename,
+              files: fileDetails.sort((a, b) => b.mtime - a.mtime), // newest first
+            });
+          }
+        }
+      }
+
+      // Find content duplicates (exact match via hash)
+      if (method === "content" || method === "both") {
+        const byContentHash = new Map<string, string[]>();
+
+        // Simple hash function for content comparison
+        const simpleHash = (str: string): string => {
+          let hash = 0;
+          const normalized = str.replace(/^---[\s\S]*?---\n?/, "").trim().toLowerCase();
+          for (let i = 0; i < normalized.length; i++) {
+            const char = normalized.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+          }
+          return hash.toString(16);
+        };
+
+        for (const file of mdFiles) {
+          try {
+            if (await isHidden(file)) continue;
+
+            const content = await makeRequest(
+              LocalRestAPI.ApiContentResponse,
+              `/vault/${encodeURIComponent(file)}`,
+              { headers: { Accept: "text/markdown" } },
+            );
+
+            // Skip very short content (likely empty notes)
+            const cleanContent = content.replace(/^---[\s\S]*?---\n?/, "").trim();
+            if (cleanContent.length < 50) continue;
+
+            const hash = simpleHash(content);
+            const existing = byContentHash.get(hash) || [];
+            existing.push(file);
+            byContentHash.set(hash, existing);
+          } catch {
+            continue;
+          }
+        }
+
+        for (const [hash, files] of byContentHash) {
+          if (files.length > 1) {
+            // Verify they're not already in filename duplicates
+            const filenames = files.map((f) => (f.split("/").pop() || f).toLowerCase());
+            const allSameFilename = filenames.every((f) => f === filenames[0]);
+
+            // Skip if this is already captured by filename duplicates
+            if (method === "both" && allSameFilename) continue;
+
+            const fileDetails = await Promise.all(
+              files.map(async (f) => {
+                try {
+                  const note = await makeRequest(
+                    LocalRestAPI.ApiNoteJson,
+                    `/vault/${encodeURIComponent(f)}`,
+                    { headers: { Accept: "application/vnd.olrapi.note+json" } },
+                  );
+                  return {
+                    path: f,
+                    size: note.stat?.size || 0,
+                    mtime: note.stat?.mtime || 0,
+                  };
+                } catch {
+                  return { path: f, size: 0, mtime: 0 };
+                }
+              })
+            );
+
+            duplicateGroups.push({
+              type: "content",
+              key: `content-hash-${hash}`,
+              files: fileDetails.sort((a, b) => b.mtime - a.mtime),
+            });
+          }
+        }
+      }
+
+      // Sort by number of duplicates (most dupes first) and apply limit
+      duplicateGroups.sort((a, b) => b.files.length - a.files.length);
+      const limitedGroups = duplicateGroups.slice(0, limit);
+
+      // Calculate totals
+      const totalDuplicateFiles = duplicateGroups.reduce((sum, g) => sum + g.files.length - 1, 0);
+      const filenameGroups = duplicateGroups.filter((g) => g.type === "filename").length;
+      const contentGroups = duplicateGroups.filter((g) => g.type === "content").length;
+
+      const result = {
+        totalNotesScanned: mdFiles.length,
+        duplicateGroups: duplicateGroups.length,
+        totalDuplicateFiles,
+        byType: {
+          filenameDuplicates: filenameGroups,
+          contentDuplicates: contentGroups,
+        },
+        groups: limitedGroups,
+        truncated: duplicateGroups.length > limit,
+        hint: duplicateGroups.length > 0
+          ? "Review each group - keep the newest/largest and remove or merge others"
+          : "No duplicate notes found!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // BULK MOVE FILES - vault organization tool
+  tools.register(
+    type({
+      name: '"bulk_move_files"',
+      arguments: {
+        match: type("string").describe("Glob pattern, regex, or search query to match files"),
+        destination: type("string").describe("Destination directory (will be created if needed)"),
+        "type?": type('"glob" | "regex" | "search"').describe("How to interpret 'match' (default: glob)"),
+        "flatten?": type("boolean").describe("Remove subdirectory structure, move all to destination root (default: false)"),
+        "overwrite?": type("boolean").describe("Overwrite existing files at destination (default: false)"),
+        "dryRun?": type("boolean").describe("Preview moves without executing (default: true)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
+      },
+    }).describe(
+      "Move multiple files matching a pattern to a destination directory. Defaults to dry-run for safety.",
+    ),
+    async ({ arguments: args }) => {
+      const matchType = args.type ?? "glob";
+      const limit = args.limit ?? 100;
+      const dryRun = args.dryRun ?? true;
+      const flatten = args.flatten ?? false;
+      const overwrite = args.overwrite ?? false;
+      const destination = validateVaultPath(args.destination);
+
+      // Helper to match glob pattern
+      const matchesGlob = (filePath: string, globPattern: string): boolean => {
+        const regexPattern = globPattern
+          .replace(/\./g, "\\.")
+          .replace(/\*\*/g, "<<<GLOBSTAR>>>")
+          .replace(/\*/g, "[^/]*")
+          .replace(/<<<GLOBSTAR>>>/g, ".*")
+          .replace(/\?/g, ".");
+        return new RegExp(`^${regexPattern}$`).test(filePath);
+      };
+
+      let matchingFiles: string[];
+
+      if (matchType === "search") {
+        const searchResults = await makeRequest(
+          LocalRestAPI.ApiSimpleSearchResponse,
+          `/search/simple/?query=${encodeURIComponent(args.match)}`,
+          { method: "POST" },
+        );
+        matchingFiles = [...new Set(
+          searchResults.map((result: { filename: string }) => result.filename)
+        )];
+      } else if (matchType === "regex") {
+        let matchRegex: RegExp;
+        try {
+          matchRegex = new RegExp(args.match);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: `Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`,
+            }],
+            isError: true,
+          };
+        }
+
+        const allFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          "/vault/",
+        );
+        matchingFiles = allFiles.files.filter((file: string) => matchRegex.test(file));
+      } else {
+        const allFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          "/vault/",
+        );
+        matchingFiles = allFiles.files.filter((file: string) => matchesGlob(file, args.match));
+      }
+
+      // Get existing files at destination to check for conflicts
+      let existingAtDest: string[] = [];
+      try {
+        const destFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          `/vault/${destination}/`,
+        );
+        existingAtDest = destFiles.files.map((f: string) => f.split("/").pop() || f);
+      } catch {
+        // Destination doesn't exist yet, that's fine
+      }
+
+      const filesToProcess = matchingFiles.slice(0, limit);
+      const truncated = matchingFiles.length > limit;
+
+      type MoveOperation = {
+        source: string;
+        destination: string;
+        conflict: boolean;
+      };
+
+      const operations: MoveOperation[] = [];
+
+      for (const source of filesToProcess) {
+        const filename = source.split("/").pop() || source;
+        let destPath: string;
+
+        if (flatten) {
+          destPath = `${destination}/${filename}`;
+        } else {
+          // Preserve directory structure relative to match
+          destPath = `${destination}/${source}`;
+        }
+
+        const destFilename = destPath.split("/").pop() || destPath;
+        const conflict = existingAtDest.includes(destFilename);
+
+        operations.push({
+          source,
+          destination: destPath,
+          conflict,
+        });
+      }
+
+      if (dryRun) {
+        const conflicts = operations.filter((op) => op.conflict);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "dry-run",
+              matchType,
+              match: args.match,
+              destination,
+              flatten,
+              matchCount: matchingFiles.length,
+              operations: operations.slice(0, 20), // Show first 20
+              conflictCount: conflicts.length,
+              truncated,
+              message: `Found ${matchingFiles.length} files. ${conflicts.length} conflicts. Set dryRun: false to execute.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // Execute moves
+      const moved: string[] = [];
+      const skipped: Array<{ file: string; reason: string }> = [];
+      const failed: Array<{ file: string; error: string }> = [];
+
+      for (const op of operations) {
+        try {
+          // Check if source is protected
+          try {
+            await assertNotProtected(op.source);
+          } catch {
+            skipped.push({ file: op.source, reason: "protected" });
+            continue;
+          }
+
+          // Check for conflict
+          if (op.conflict && !overwrite) {
+            skipped.push({ file: op.source, reason: "destination exists" });
+            continue;
+          }
+
+          // Read source content
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          // Write to destination
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.destination)}`,
+            { method: "PUT", body: content },
+          );
+
+          // Delete source
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { method: "DELETE" },
+          );
+
+          moved.push(`${op.source} → ${op.destination}`);
+        } catch (error) {
+          failed.push({
+            file: op.source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: "execute",
+            matchType,
+            destination,
+            moved,
+            skipped,
+            failed,
+            movedCount: moved.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            truncated,
+          }, null, 2),
+        }],
+      };
+    },
+  );
+
+  // BULK RENAME FILES - vault organization tool
+  tools.register(
+    type({
+      name: '"bulk_rename_files"',
+      arguments: {
+        match: type("string").describe("Glob pattern or regex to match files"),
+        "type?": type('"glob" | "regex"').describe("How to interpret 'match' (default: glob)"),
+        "template?": type("string").describe("New filename template using {frontmatter.field}, {filename}, {date}, {index}"),
+        "prefix?": type("string").describe("Add prefix to filename"),
+        "suffix?": type("string").describe("Add suffix before extension"),
+        "replace?": type("string").describe("Regex pattern to replace in filename"),
+        "replaceWith?": type("string").describe("Replacement string (use $1, $2 for capture groups)"),
+        "dryRun?": type("boolean").describe("Preview renames without executing (default: true)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
+      },
+    }).describe(
+      "Rename multiple files using templates with frontmatter fields, or find/replace patterns. Defaults to dry-run for safety.",
+    ),
+    async ({ arguments: args }) => {
+      const matchType = args.type ?? "glob";
+      const limit = args.limit ?? 100;
+      const dryRun = args.dryRun ?? true;
+
+      // Helper to match glob pattern
+      const matchesGlob = (filePath: string, globPattern: string): boolean => {
+        const regexPattern = globPattern
+          .replace(/\./g, "\\.")
+          .replace(/\*\*/g, "<<<GLOBSTAR>>>")
+          .replace(/\*/g, "[^/]*")
+          .replace(/<<<GLOBSTAR>>>/g, ".*")
+          .replace(/\?/g, ".");
+        return new RegExp(`^${regexPattern}$`).test(filePath);
+      };
+
+      // Get matching files
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        "/vault/",
+      );
+
+      let matchingFiles: string[];
+      if (matchType === "regex") {
+        let matchRegex: RegExp;
+        try {
+          matchRegex = new RegExp(args.match);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: `Invalid regex: ${error instanceof Error ? error.message : String(error)}`,
+            }],
+            isError: true,
+          };
+        }
+        matchingFiles = allFiles.files.filter((f: string) => matchRegex.test(f));
+      } else {
+        matchingFiles = allFiles.files.filter((f: string) => matchesGlob(f, args.match));
+      }
+
+      const filesToProcess = matchingFiles.slice(0, limit);
+      const truncated = matchingFiles.length > limit;
+
+      type RenameOperation = {
+        source: string;
+        destination: string;
+        error?: string;
+      };
+
+      const operations: RenameOperation[] = [];
+
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const source = filesToProcess[i];
+        const dir = source.includes("/") ? source.substring(0, source.lastIndexOf("/") + 1) : "";
+        const filename = source.split("/").pop() || source;
+        const ext = filename.includes(".") ? filename.substring(filename.lastIndexOf(".")) : "";
+        const basename = filename.replace(/\.[^.]+$/, "");
+
+        let newFilename: string;
+
+        try {
+          if (args.template) {
+            // Fetch frontmatter for template
+            const note = await makeRequest(
+              LocalRestAPI.ApiNoteJson,
+              `/vault/${encodeURIComponent(source)}`,
+              { headers: { Accept: "application/vnd.olrapi.note+json" } },
+            );
+
+            newFilename = args.template
+              .replace(/\{filename\}/g, basename)
+              .replace(/\{ext\}/g, ext)
+              .replace(/\{index\}/g, String(i + 1).padStart(3, "0"))
+              .replace(/\{date\}/g, new Date().toISOString().split("T")[0]);
+
+            // Replace frontmatter placeholders
+            const frontmatterMatches = args.template.match(/\{frontmatter\.([^}]+)\}/g) || [];
+            for (const match of frontmatterMatches) {
+              const field = match.replace(/\{frontmatter\.([^}]+)\}/, "$1");
+              const value = note.frontmatter?.[field] || "";
+              newFilename = newFilename.replace(match, String(value));
+            }
+
+            // Ensure extension
+            if (!newFilename.endsWith(ext)) {
+              newFilename += ext;
+            }
+          } else if (args.replace && args.replaceWith !== undefined) {
+            // Find/replace mode
+            const replaceRegex = new RegExp(args.replace, "g");
+            newFilename = filename.replace(replaceRegex, args.replaceWith);
+          } else {
+            // Prefix/suffix mode
+            newFilename = (args.prefix || "") + basename + (args.suffix || "") + ext;
+          }
+
+          // Sanitize filename
+          newFilename = newFilename.replace(/[<>:"/\\|?*]/g, "-");
+
+          operations.push({
+            source,
+            destination: dir + newFilename,
+          });
+        } catch (error) {
+          operations.push({
+            source,
+            destination: source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (dryRun) {
+        const changes = operations.filter((op) => op.source !== op.destination && !op.error);
+        const errors = operations.filter((op) => op.error);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "dry-run",
+              matchCount: matchingFiles.length,
+              changeCount: changes.length,
+              errorCount: errors.length,
+              operations: operations.slice(0, 30),
+              truncated,
+              message: `Would rename ${changes.length} files. Set dryRun: false to execute.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // Execute renames
+      const renamed: string[] = [];
+      const skipped: Array<{ file: string; reason: string }> = [];
+      const failed: Array<{ file: string; error: string }> = [];
+
+      for (const op of operations) {
+        if (op.error) {
+          failed.push({ file: op.source, error: op.error });
+          continue;
+        }
+        if (op.source === op.destination) {
+          skipped.push({ file: op.source, reason: "no change" });
+          continue;
+        }
+
+        try {
+          await assertNotProtected(op.source);
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.destination)}`,
+            { method: "PUT", body: content },
+          );
+
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { method: "DELETE" },
+          );
+
+          renamed.push(`${op.source} → ${op.destination}`);
+        } catch (error) {
+          failed.push({
+            file: op.source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: "execute",
+            renamed,
+            skipped,
+            failed,
+            renamedCount: renamed.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            truncated,
+          }, null, 2),
+        }],
+      };
+    },
+  );
+
+  // DELETE BY FRONTMATTER - vault cleanup tool
+  tools.register(
+    type({
+      name: '"delete_by_frontmatter"',
+      arguments: {
+        field: type("string").describe("Frontmatter field to check"),
+        value: type("string | string[]").describe("Value(s) to match (exact match or any in array)"),
+        "operator?": type('"equals" | "contains" | "startsWith" | "endsWith" | "regex" | "exists" | "notExists"').describe("Match operator (default: equals)"),
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "dryRun?": type("boolean").describe("Preview deletions without executing (default: true)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
+      },
+    }).describe(
+      "Delete files where frontmatter field matches criteria. Great for cleaning up imported/tagged content. Defaults to dry-run for safety.",
+    ),
+    async ({ arguments: args }) => {
+      const operator = args.operator ?? "equals";
+      const limit = args.limit ?? 100;
+      const dryRun = args.dryRun ?? true;
+      const values = Array.isArray(args.value) ? args.value : [args.value];
+
+      // Get all markdown files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      // Find files matching frontmatter criteria
+      const matchingFiles: Array<{ path: string; fieldValue: unknown }> = [];
+
+      for (const file of mdFiles) {
+        try {
+          if (await isHidden(file)) continue;
+
+          const note = await makeRequest(
+            LocalRestAPI.ApiNoteJson,
+            `/vault/${encodeURIComponent(file)}`,
+            { headers: { Accept: "application/vnd.olrapi.note+json" } },
+          );
+
+          const fieldValue = note.frontmatter?.[args.field];
+
+          let matches = false;
+
+          switch (operator) {
+            case "exists":
+              matches = fieldValue !== undefined && fieldValue !== null;
+              break;
+            case "notExists":
+              matches = fieldValue === undefined || fieldValue === null;
+              break;
+            case "equals":
+              matches = values.some((v) => fieldValue === v || String(fieldValue) === v);
+              break;
+            case "contains":
+              if (Array.isArray(fieldValue)) {
+                matches = values.some((v) => fieldValue.includes(v));
+              } else {
+                matches = values.some((v) => String(fieldValue).includes(v));
+              }
+              break;
+            case "startsWith":
+              matches = values.some((v) => String(fieldValue).startsWith(v));
+              break;
+            case "endsWith":
+              matches = values.some((v) => String(fieldValue).endsWith(v));
+              break;
+            case "regex":
+              try {
+                const regex = new RegExp(values[0]);
+                matches = regex.test(String(fieldValue));
+              } catch {
+                matches = false;
+              }
+              break;
+          }
+
+          if (matches) {
+            matchingFiles.push({ path: file, fieldValue });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      const filesToProcess = matchingFiles.slice(0, limit);
+      const truncated = matchingFiles.length > limit;
+
+      if (dryRun) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "dry-run",
+              field: args.field,
+              operator,
+              values,
+              totalScanned: mdFiles.length,
+              matchCount: matchingFiles.length,
+              wouldDelete: filesToProcess,
+              truncated,
+              message: `Found ${matchingFiles.length} files matching criteria. Set dryRun: false to delete.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // Execute deletions
+      const deleted: string[] = [];
+      const skipped: Array<{ file: string; reason: string }> = [];
+      const failed: Array<{ file: string; error: string }> = [];
+
+      for (const file of filesToProcess) {
+        try {
+          await assertNotProtected(file.path);
+
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(file.path)}`,
+            { method: "DELETE" },
+          );
+
+          deleted.push(file.path);
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("protected")) {
+            skipped.push({ file: file.path, reason: "protected" });
+          } else {
+            failed.push({
+              file: file.path,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: "execute",
+            field: args.field,
+            operator,
+            deleted,
+            skipped,
+            failed,
+            deletedCount: deleted.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            truncated,
+          }, null, 2),
+        }],
+      };
+    },
+  );
 }
