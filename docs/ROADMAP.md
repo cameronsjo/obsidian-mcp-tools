@@ -17,6 +17,7 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
+| Response size optimization | `planned` | Critical | Medium | [response-size-optimization.md](roadmap/response-size-optimization.md) - Tools return 25k+ tokens, exhausting LLM context. Add pagination/limits to all data-returning tools |
 | Special character handling in delete | `planned` | High | Medium | `obsidian_delete_note` fails on apostrophes, commas, emoji, curly quotes - path resolution bug (in cyanheads/obsidian-mcp-server, not this project) |
 | Add `move_note` tool | `done` | High | Small | `move_vault_file` and `rename_vault_file` tools added |
 | Bulk delete operations | `done` | High | Medium | `bulk_delete_by_pattern`, `bulk_delete_by_regex`, `bulk_delete_by_query` tools added with dry-run safety |
@@ -43,6 +44,9 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
+| Load testing infrastructure | `idea` | High | Medium | [load-testing.md](roadmap/load-testing.md) - Benchmarks, test vault generator, performance budgets, CI regression detection |
+| Response streaming for large results | `idea` | Medium | Medium | Stream responses for large file reads and search results to reduce memory pressure |
+| Caching layer for repeated queries | `idea` | Medium | Medium | LRU cache for file metadata, search results, plugin status checks |
 
 ## Technical Debt
 
