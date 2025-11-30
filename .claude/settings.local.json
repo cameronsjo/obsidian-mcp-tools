@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "SlashCommand(/roadmap.add:*)",
+      "Bash(~/.bun/bin/bun test:*)",
+      "Bash(~/.bun/bin/bun install:*)",
+      "Bash(~/.bun/bin/bun run:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

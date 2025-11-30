@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import fs from "fs";
 import fsp from "fs/promises";
 import https from "https";
@@ -33,6 +34,113 @@ export function getDownloadUrl(platform: Platform, arch: Arch): string {
   } else { // linux
     return `${GITHUB_DOWNLOAD_URL}/mcp-server-linux`;  // Linux binary doesn't include arch in filename
   }
+}
+
+export function getBinaryFilename(platform: Platform, arch: Arch): string {
+  if (platform === "windows") {
+    return "mcp-server-windows.exe";
+  } else if (platform === "macos") {
+    return `mcp-server-macos-${arch}`;
+  } else {
+    return "mcp-server-linux";
+  }
+}
+
+export function getChecksumsUrl(): string {
+  return `${GITHUB_DOWNLOAD_URL}/checksums.txt`;
+}
+
+/**
+ * Downloads the checksums file and parses it into a map of filename -> hash
+ */
+export async function fetchChecksums(): Promise<Map<string, string>> {
+  const url = getChecksumsUrl();
+
+  return new Promise((resolve, reject) => {
+    const fetchWithRedirects = (fetchUrl: string, redirects = 0) => {
+      if (redirects > 5) {
+        reject(new Error("Too many redirects while fetching checksums"));
+        return;
+      }
+
+      https.get(fetchUrl, (response) => {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location;
+          if (!redirectUrl) {
+            reject(new Error("Redirect without location header"));
+            return;
+          }
+          fetchWithRedirects(redirectUrl, redirects + 1);
+          return;
+        }
+
+        if (response.statusCode !== 200) {
+          reject(new Error(`Failed to fetch checksums: HTTP ${response.statusCode}`));
+          return;
+        }
+
+        let data = "";
+        response.on("data", (chunk) => { data += chunk; });
+        response.on("end", () => {
+          const checksums = new Map<string, string>();
+          const lines = data.trim().split("\n");
+
+          for (const line of lines) {
+            // Format: "hash  filename" (two spaces between hash and filename)
+            const match = line.match(/^([a-f0-9]{64})\s+(.+)$/);
+            if (match) {
+              checksums.set(match[2], match[1]);
+            }
+          }
+
+          if (checksums.size === 0) {
+            reject(new Error("No valid checksums found in checksums.txt"));
+            return;
+          }
+
+          resolve(checksums);
+        });
+        response.on("error", reject);
+      }).on("error", reject);
+    };
+
+    fetchWithRedirects(url);
+  });
+}
+
+/**
+ * Calculates the SHA-256 hash of a file
+ */
+export async function calculateFileHash(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+
+    stream.on("data", (data) => hash.update(data));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", reject);
+  });
+}
+
+/**
+ * Verifies the integrity of a downloaded binary against the expected checksum
+ */
+export async function verifyBinaryIntegrity(
+  filePath: string,
+  expectedHash: string,
+): Promise<boolean> {
+  const actualHash = await calculateFileHash(filePath);
+  const matches = actualHash.toLowerCase() === expectedHash.toLowerCase();
+
+  if (!matches) {
+    logger.error("Binary integrity check failed", {
+      expected: expectedHash,
+      actual: actualHash,
+      filePath,
+    });
+  }
+
+  return matches;
 }
 
 /**
@@ -219,12 +327,27 @@ export async function installMcpServer(
     const platform = getPlatform();
     const arch = getArch();
     const downloadUrl = getDownloadUrl(platform, arch);
+    const binaryFilename = getBinaryFilename(platform, arch);
     const installPath = await getInstallPath(plugin);
     if ("error" in installPath) throw new Error(installPath.error);
 
     await ensureDirectory(installPath.dir);
 
-    const progressNotice = new Notice("Downloading MCP server...", 0);
+    // Fetch checksums first
+    const progressNotice = new Notice("Fetching checksums...", 0);
+    let checksums: Map<string, string>;
+    try {
+      checksums = await fetchChecksums();
+      logger.debug("Fetched checksums", { count: checksums.size });
+    } catch (error) {
+      // Log warning but continue - checksums might not exist for older releases
+      logger.warn("Could not fetch checksums, skipping integrity verification", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      checksums = new Map();
+    }
+
+    progressNotice.setMessage("Downloading MCP server...");
     logger.debug("Downloading MCP server:", { downloadUrl, installPath });
 
     const download$ = downloadFile(downloadUrl, installPath.path);
@@ -242,11 +365,45 @@ export async function installMcpServer(
           logger.error("Download failed:", { error, installPath });
           reject(error);
         },
-        complete: () => {
-          progressNotice.hide();
-          new Notice("MCP server downloaded successfully!");
-          logger.info("MCP server downloaded", { installPath });
-          resolve(installPath);
+        complete: async () => {
+          try {
+            // Verify binary integrity if checksum is available
+            const expectedHash = checksums.get(binaryFilename);
+            if (expectedHash) {
+              progressNotice.setMessage("Verifying binary integrity...");
+              const isValid = await verifyBinaryIntegrity(installPath.path, expectedHash);
+
+              if (!isValid) {
+                // Delete the corrupted/tampered binary
+                await fsp.unlink(installPath.path).catch(() => {});
+                progressNotice.hide();
+                const error = new Error(
+                  "Binary integrity verification failed. The download may be corrupted or tampered with.",
+                );
+                new Notice(error.message, 0);
+                logger.error("Binary integrity verification failed", {
+                  binaryFilename,
+                  installPath: installPath.path,
+                });
+                reject(error);
+                return;
+              }
+
+              logger.info("Binary integrity verified", { binaryFilename });
+            } else {
+              logger.warn("No checksum available for binary, skipping verification", {
+                binaryFilename,
+              });
+            }
+
+            progressNotice.hide();
+            new Notice("MCP server downloaded successfully!");
+            logger.info("MCP server downloaded", { installPath });
+            resolve(installPath);
+          } catch (error) {
+            progressNotice.hide();
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
         },
       });
     });

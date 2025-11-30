@@ -43,6 +43,12 @@ jobs:
       - name: Zip Release Artifacts
         run: bun run zip
 
+      - name: Generate SHA-256 checksums
+        run: |
+          cd packages/mcp-server/dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
       - name: Generate artifact attestation for MCP server binaries
         uses: actions/attest-build-provenance@v2
         with:
@@ -69,7 +75,7 @@ jobs:
           allowUpdates: true
           omitName: true
           tag: ${{ github.ref_name }}
-          artifacts: "packages/obsidian-plugin/releases/obsidian-plugin-*.zip,main.js,manifest.json,styles.css,packages/mcp-server/dist/*"
+          artifacts: "packages/obsidian-plugin/releases/obsidian-plugin-*.zip,main.js,manifest.json,styles.css,packages/mcp-server/dist/*,packages/mcp-server/dist/checksums.txt"
           body: |
             ${{ steps.get_release_body.outputs.result }}
 
