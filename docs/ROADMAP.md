@@ -25,6 +25,9 @@ Critical issues that block core functionality.
 
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
+| Unified tool dispatch with dynamic plugin detection | `idea` | High | Large | [unified-tool-dispatch.md](roadmap/unified-tool-dispatch.md) - Reduce 21+ tools to ~5 dispatchers with dictionary-style operation lookup |
+| MCP authorization scopes | `idea` | High | Medium | [mcp-authorization-scopes.md](roadmap/mcp-authorization-scopes.md) - OAuth-style scopes (readonly, editor, full) per API key |
+| Tool-as-Code execution | `idea` | High | Medium | [tool-as-code.md](roadmap/tool-as-code.md) - Single `execute` tool for JavaScript code against vault API per [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) |
 | Delete by frontmatter query | `idea` | High | Medium | Delete files where frontmatter matches criteria (e.g., `subreddit: ["nsfw1", "nsfw2"]`) |
 | Find duplicate notes | `idea` | High | Medium | Detect dupes by filename/content/hash, suggest which to keep by size/date |
 | Bulk move operations | `idea` | High | Medium | Move multiple files matching pattern to destination, with flatten option |
