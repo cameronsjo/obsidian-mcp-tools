@@ -1841,4 +1841,376 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // BULK RENAME FILES - vault organization tool
+  tools.register(
+    type({
+      name: '"bulk_rename_files"',
+      arguments: {
+        match: type("string").describe("Glob pattern or regex to match files"),
+        "type?": type('"glob" | "regex"').describe("How to interpret 'match' (default: glob)"),
+        "template?": type("string").describe("New filename template using {frontmatter.field}, {filename}, {date}, {index}"),
+        "prefix?": type("string").describe("Add prefix to filename"),
+        "suffix?": type("string").describe("Add suffix before extension"),
+        "replace?": type("string").describe("Regex pattern to replace in filename"),
+        "replaceWith?": type("string").describe("Replacement string (use $1, $2 for capture groups)"),
+        "dryRun?": type("boolean").describe("Preview renames without executing (default: true)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
+      },
+    }).describe(
+      "Rename multiple files using templates with frontmatter fields, or find/replace patterns. Defaults to dry-run for safety.",
+    ),
+    async ({ arguments: args }) => {
+      const matchType = args.type ?? "glob";
+      const limit = args.limit ?? 100;
+      const dryRun = args.dryRun ?? true;
+
+      // Helper to match glob pattern
+      const matchesGlob = (filePath: string, globPattern: string): boolean => {
+        const regexPattern = globPattern
+          .replace(/\./g, "\\.")
+          .replace(/\*\*/g, "<<<GLOBSTAR>>>")
+          .replace(/\*/g, "[^/]*")
+          .replace(/<<<GLOBSTAR>>>/g, ".*")
+          .replace(/\?/g, ".");
+        return new RegExp(`^${regexPattern}$`).test(filePath);
+      };
+
+      // Get matching files
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        "/vault/",
+      );
+
+      let matchingFiles: string[];
+      if (matchType === "regex") {
+        let matchRegex: RegExp;
+        try {
+          matchRegex = new RegExp(args.match);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: `Invalid regex: ${error instanceof Error ? error.message : String(error)}`,
+            }],
+            isError: true,
+          };
+        }
+        matchingFiles = allFiles.files.filter((f: string) => matchRegex.test(f));
+      } else {
+        matchingFiles = allFiles.files.filter((f: string) => matchesGlob(f, args.match));
+      }
+
+      const filesToProcess = matchingFiles.slice(0, limit);
+      const truncated = matchingFiles.length > limit;
+
+      type RenameOperation = {
+        source: string;
+        destination: string;
+        error?: string;
+      };
+
+      const operations: RenameOperation[] = [];
+
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const source = filesToProcess[i];
+        const dir = source.includes("/") ? source.substring(0, source.lastIndexOf("/") + 1) : "";
+        const filename = source.split("/").pop() || source;
+        const ext = filename.includes(".") ? filename.substring(filename.lastIndexOf(".")) : "";
+        const basename = filename.replace(/\.[^.]+$/, "");
+
+        let newFilename: string;
+
+        try {
+          if (args.template) {
+            // Fetch frontmatter for template
+            const note = await makeRequest(
+              LocalRestAPI.ApiNoteJson,
+              `/vault/${encodeURIComponent(source)}`,
+              { headers: { Accept: "application/vnd.olrapi.note+json" } },
+            );
+
+            newFilename = args.template
+              .replace(/\{filename\}/g, basename)
+              .replace(/\{ext\}/g, ext)
+              .replace(/\{index\}/g, String(i + 1).padStart(3, "0"))
+              .replace(/\{date\}/g, new Date().toISOString().split("T")[0]);
+
+            // Replace frontmatter placeholders
+            const frontmatterMatches = args.template.match(/\{frontmatter\.([^}]+)\}/g) || [];
+            for (const match of frontmatterMatches) {
+              const field = match.replace(/\{frontmatter\.([^}]+)\}/, "$1");
+              const value = note.frontmatter?.[field] || "";
+              newFilename = newFilename.replace(match, String(value));
+            }
+
+            // Ensure extension
+            if (!newFilename.endsWith(ext)) {
+              newFilename += ext;
+            }
+          } else if (args.replace && args.replaceWith !== undefined) {
+            // Find/replace mode
+            const replaceRegex = new RegExp(args.replace, "g");
+            newFilename = filename.replace(replaceRegex, args.replaceWith);
+          } else {
+            // Prefix/suffix mode
+            newFilename = (args.prefix || "") + basename + (args.suffix || "") + ext;
+          }
+
+          // Sanitize filename
+          newFilename = newFilename.replace(/[<>:"/\\|?*]/g, "-");
+
+          operations.push({
+            source,
+            destination: dir + newFilename,
+          });
+        } catch (error) {
+          operations.push({
+            source,
+            destination: source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (dryRun) {
+        const changes = operations.filter((op) => op.source !== op.destination && !op.error);
+        const errors = operations.filter((op) => op.error);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "dry-run",
+              matchCount: matchingFiles.length,
+              changeCount: changes.length,
+              errorCount: errors.length,
+              operations: operations.slice(0, 30),
+              truncated,
+              message: `Would rename ${changes.length} files. Set dryRun: false to execute.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // Execute renames
+      const renamed: string[] = [];
+      const skipped: Array<{ file: string; reason: string }> = [];
+      const failed: Array<{ file: string; error: string }> = [];
+
+      for (const op of operations) {
+        if (op.error) {
+          failed.push({ file: op.source, error: op.error });
+          continue;
+        }
+        if (op.source === op.destination) {
+          skipped.push({ file: op.source, reason: "no change" });
+          continue;
+        }
+
+        try {
+          await assertNotProtected(op.source);
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.destination)}`,
+            { method: "PUT", body: content },
+          );
+
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { method: "DELETE" },
+          );
+
+          renamed.push(`${op.source} → ${op.destination}`);
+        } catch (error) {
+          failed.push({
+            file: op.source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: "execute",
+            renamed,
+            skipped,
+            failed,
+            renamedCount: renamed.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            truncated,
+          }, null, 2),
+        }],
+      };
+    },
+  );
+
+  // DELETE BY FRONTMATTER - vault cleanup tool
+  tools.register(
+    type({
+      name: '"delete_by_frontmatter"',
+      arguments: {
+        field: type("string").describe("Frontmatter field to check"),
+        value: type("string | string[]").describe("Value(s) to match (exact match or any in array)"),
+        "operator?": type('"equals" | "contains" | "startsWith" | "endsWith" | "regex" | "exists" | "notExists"').describe("Match operator (default: equals)"),
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "dryRun?": type("boolean").describe("Preview deletions without executing (default: true)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
+      },
+    }).describe(
+      "Delete files where frontmatter field matches criteria. Great for cleaning up imported/tagged content. Defaults to dry-run for safety.",
+    ),
+    async ({ arguments: args }) => {
+      const operator = args.operator ?? "equals";
+      const limit = args.limit ?? 100;
+      const dryRun = args.dryRun ?? true;
+      const values = Array.isArray(args.value) ? args.value : [args.value];
+
+      // Get all markdown files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      // Find files matching frontmatter criteria
+      const matchingFiles: Array<{ path: string; fieldValue: unknown }> = [];
+
+      for (const file of mdFiles) {
+        try {
+          if (await isHidden(file)) continue;
+
+          const note = await makeRequest(
+            LocalRestAPI.ApiNoteJson,
+            `/vault/${encodeURIComponent(file)}`,
+            { headers: { Accept: "application/vnd.olrapi.note+json" } },
+          );
+
+          const fieldValue = note.frontmatter?.[args.field];
+
+          let matches = false;
+
+          switch (operator) {
+            case "exists":
+              matches = fieldValue !== undefined && fieldValue !== null;
+              break;
+            case "notExists":
+              matches = fieldValue === undefined || fieldValue === null;
+              break;
+            case "equals":
+              matches = values.some((v) => fieldValue === v || String(fieldValue) === v);
+              break;
+            case "contains":
+              if (Array.isArray(fieldValue)) {
+                matches = values.some((v) => fieldValue.includes(v));
+              } else {
+                matches = values.some((v) => String(fieldValue).includes(v));
+              }
+              break;
+            case "startsWith":
+              matches = values.some((v) => String(fieldValue).startsWith(v));
+              break;
+            case "endsWith":
+              matches = values.some((v) => String(fieldValue).endsWith(v));
+              break;
+            case "regex":
+              try {
+                const regex = new RegExp(values[0]);
+                matches = regex.test(String(fieldValue));
+              } catch {
+                matches = false;
+              }
+              break;
+          }
+
+          if (matches) {
+            matchingFiles.push({ path: file, fieldValue });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      const filesToProcess = matchingFiles.slice(0, limit);
+      const truncated = matchingFiles.length > limit;
+
+      if (dryRun) {
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "dry-run",
+              field: args.field,
+              operator,
+              values,
+              totalScanned: mdFiles.length,
+              matchCount: matchingFiles.length,
+              wouldDelete: filesToProcess,
+              truncated,
+              message: `Found ${matchingFiles.length} files matching criteria. Set dryRun: false to delete.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // Execute deletions
+      const deleted: string[] = [];
+      const skipped: Array<{ file: string; reason: string }> = [];
+      const failed: Array<{ file: string; error: string }> = [];
+
+      for (const file of filesToProcess) {
+        try {
+          await assertNotProtected(file.path);
+
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(file.path)}`,
+            { method: "DELETE" },
+          );
+
+          deleted.push(file.path);
+        } catch (error) {
+          if (error instanceof Error && error.message.includes("protected")) {
+            skipped.push({ file: file.path, reason: "protected" });
+          } else {
+            failed.push({
+              file: file.path,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: "execute",
+            field: args.field,
+            operator,
+            deleted,
+            skipped,
+            failed,
+            deletedCount: deleted.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            truncated,
+          }, null, 2),
+        }],
+      };
+    },
+  );
 }
