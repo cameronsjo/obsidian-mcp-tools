@@ -6,6 +6,7 @@ import { registerLocalRestApiTools } from "../local-rest-api";
 import { setupObsidianPrompts } from "../prompts";
 import { registerSmartConnectionsTools } from "../smart-connections";
 import { registerTemplaterTools } from "../templates";
+import { registerDispatcherTools } from "../dispatchers";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -47,10 +48,15 @@ export class ObsidianMcpServer {
   private setupHandlers() {
     setupObsidianPrompts(this.server);
 
+    // Register legacy tools (backward compatibility)
     registerFetchTool(this.tools, this.server);
     registerLocalRestApiTools(this.tools, this.server);
     registerSmartConnectionsTools(this.tools);
     registerTemplaterTools(this.tools);
+
+    // Register new unified dispatcher tools
+    // These provide the same functionality with ~70% less context usage
+    registerDispatcherTools(this.tools);
 
     this.server.setRequestHandler(ListToolsRequestSchema, this.tools.list);
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
