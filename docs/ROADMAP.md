@@ -30,7 +30,7 @@ Critical issues that block core functionality.
 | Tool-as-Code execution | `idea` | High | Medium | [tool-as-code.md](roadmap/tool-as-code.md) - Single `execute` tool for JavaScript code against vault API per [Anthropic's pattern](https://www.anthropic.com/engineering/code-execution-with-mcp) |
 | Delete by frontmatter query | `idea` | High | Medium | Delete files where frontmatter matches criteria (e.g., `subreddit: ["nsfw1", "nsfw2"]`) |
 | Find duplicate notes | `done` | High | Medium | `find_duplicate_notes` tool - detects dupes by filename/content hash |
-| Bulk move operations | `idea` | High | Medium | Move multiple files matching pattern to destination, with flatten option |
+| Bulk move operations | `done` | High | Medium | `bulk_move_files` tool - move files by glob/regex/search to destination with flatten option |
 | Bulk rename operations | `idea` | Medium | Medium | Rename files based on frontmatter or template pattern |
 | Find orphan attachments | `done` | Medium | Small | `find_orphan_attachments` tool - finds images/PDFs/etc not referenced by any note |
 | Find broken links | `done` | Medium | Small | `find_broken_links` tool - finds [[wikilinks]] pointing to non-existent files |

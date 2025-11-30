@@ -1632,4 +1632,213 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // BULK MOVE FILES - vault organization tool
+  tools.register(
+    type({
+      name: '"bulk_move_files"',
+      arguments: {
+        match: type("string").describe("Glob pattern, regex, or search query to match files"),
+        destination: type("string").describe("Destination directory (will be created if needed)"),
+        "type?": type('"glob" | "regex" | "search"').describe("How to interpret 'match' (default: glob)"),
+        "flatten?": type("boolean").describe("Remove subdirectory structure, move all to destination root (default: false)"),
+        "overwrite?": type("boolean").describe("Overwrite existing files at destination (default: false)"),
+        "dryRun?": type("boolean").describe("Preview moves without executing (default: true)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
+      },
+    }).describe(
+      "Move multiple files matching a pattern to a destination directory. Defaults to dry-run for safety.",
+    ),
+    async ({ arguments: args }) => {
+      const matchType = args.type ?? "glob";
+      const limit = args.limit ?? 100;
+      const dryRun = args.dryRun ?? true;
+      const flatten = args.flatten ?? false;
+      const overwrite = args.overwrite ?? false;
+      const destination = validateVaultPath(args.destination);
+
+      // Helper to match glob pattern
+      const matchesGlob = (filePath: string, globPattern: string): boolean => {
+        const regexPattern = globPattern
+          .replace(/\./g, "\\.")
+          .replace(/\*\*/g, "<<<GLOBSTAR>>>")
+          .replace(/\*/g, "[^/]*")
+          .replace(/<<<GLOBSTAR>>>/g, ".*")
+          .replace(/\?/g, ".");
+        return new RegExp(`^${regexPattern}$`).test(filePath);
+      };
+
+      let matchingFiles: string[];
+
+      if (matchType === "search") {
+        const searchResults = await makeRequest(
+          LocalRestAPI.ApiSimpleSearchResponse,
+          `/search/simple/?query=${encodeURIComponent(args.match)}`,
+          { method: "POST" },
+        );
+        matchingFiles = [...new Set(
+          searchResults.map((result: { filename: string }) => result.filename)
+        )];
+      } else if (matchType === "regex") {
+        let matchRegex: RegExp;
+        try {
+          matchRegex = new RegExp(args.match);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: `Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`,
+            }],
+            isError: true,
+          };
+        }
+
+        const allFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          "/vault/",
+        );
+        matchingFiles = allFiles.files.filter((file: string) => matchRegex.test(file));
+      } else {
+        const allFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          "/vault/",
+        );
+        matchingFiles = allFiles.files.filter((file: string) => matchesGlob(file, args.match));
+      }
+
+      // Get existing files at destination to check for conflicts
+      let existingAtDest: string[] = [];
+      try {
+        const destFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          `/vault/${destination}/`,
+        );
+        existingAtDest = destFiles.files.map((f: string) => f.split("/").pop() || f);
+      } catch {
+        // Destination doesn't exist yet, that's fine
+      }
+
+      const filesToProcess = matchingFiles.slice(0, limit);
+      const truncated = matchingFiles.length > limit;
+
+      type MoveOperation = {
+        source: string;
+        destination: string;
+        conflict: boolean;
+      };
+
+      const operations: MoveOperation[] = [];
+
+      for (const source of filesToProcess) {
+        const filename = source.split("/").pop() || source;
+        let destPath: string;
+
+        if (flatten) {
+          destPath = `${destination}/${filename}`;
+        } else {
+          // Preserve directory structure relative to match
+          destPath = `${destination}/${source}`;
+        }
+
+        const destFilename = destPath.split("/").pop() || destPath;
+        const conflict = existingAtDest.includes(destFilename);
+
+        operations.push({
+          source,
+          destination: destPath,
+          conflict,
+        });
+      }
+
+      if (dryRun) {
+        const conflicts = operations.filter((op) => op.conflict);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              mode: "dry-run",
+              matchType,
+              match: args.match,
+              destination,
+              flatten,
+              matchCount: matchingFiles.length,
+              operations: operations.slice(0, 20), // Show first 20
+              conflictCount: conflicts.length,
+              truncated,
+              message: `Found ${matchingFiles.length} files. ${conflicts.length} conflicts. Set dryRun: false to execute.`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      // Execute moves
+      const moved: string[] = [];
+      const skipped: Array<{ file: string; reason: string }> = [];
+      const failed: Array<{ file: string; error: string }> = [];
+
+      for (const op of operations) {
+        try {
+          // Check if source is protected
+          try {
+            await assertNotProtected(op.source);
+          } catch {
+            skipped.push({ file: op.source, reason: "protected" });
+            continue;
+          }
+
+          // Check for conflict
+          if (op.conflict && !overwrite) {
+            skipped.push({ file: op.source, reason: "destination exists" });
+            continue;
+          }
+
+          // Read source content
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          // Write to destination
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.destination)}`,
+            { method: "PUT", body: content },
+          );
+
+          // Delete source
+          await makeRequest(
+            LocalRestAPI.ApiNoContentResponse,
+            `/vault/${encodeURIComponent(op.source)}`,
+            { method: "DELETE" },
+          );
+
+          moved.push(`${op.source} → ${op.destination}`);
+        } catch (error) {
+          failed.push({
+            file: op.source,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            mode: "execute",
+            matchType,
+            destination,
+            moved,
+            skipped,
+            failed,
+            movedCount: moved.length,
+            skippedCount: skipped.length,
+            failedCount: failed.length,
+            truncated,
+          }, null, 2),
+        }],
+      };
+    },
+  );
 }
