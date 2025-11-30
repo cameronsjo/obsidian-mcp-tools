@@ -60,6 +60,7 @@ Critical issues that block core functionality.
 | Domain boundaries between features | `idea` | Medium | Large | Clear API contracts to prevent feature coupling |
 | Error boundary abstraction | `idea` | Medium | Medium | Standardize error handling, prevent error propagation |
 | Logger dependency injection | `idea` | Low | Small | Replace global singleton for better testability |
+| Research plugin decoupling | `idea` | High | Medium | Evaluate removing dependencies on Local REST API, Smart Connections, Templater - native Obsidian API alternatives |
 | Plugin lifecycle management service | `idea` | High | Large | Coordinate feature setup/teardown, handle initialization ordering |
 | Fix inverted dev mode in build config | `done` | High | Small | Change bun.config.ts line 37 from dev: isProd to dev: !isProd |
 | Decompose settings component into smaller parts | `idea` | Medium | Small | Split McpServerInstallSettings into StatusDisplay, DependencyList, ResourceLinks |
@@ -93,6 +94,7 @@ Critical issues that block core functionality.
 | TypeScript checking for Svelte files | `idea` | Medium | Small | Add svelte-check integration to catch type errors in .svelte components |
 | Vitest tests for Svelte components | `idea` | Medium | Medium | Setup Vitest with @testing-library/svelte, write component tests, integrate with CI |
 | Hot Module Replacement for dev mode | `idea` | Medium | Medium | Implement HMR for faster Svelte iteration, may require custom plugin reload logic |
+| Research MCP libraries for Node | `idea` | High | Small | Evaluate MCP SDK options, transport mechanisms, and best practices for Node.js MCP servers |
 
 ## Security
 
