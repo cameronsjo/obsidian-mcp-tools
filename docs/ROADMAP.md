@@ -32,7 +32,7 @@ Critical issues that block core functionality.
 | Find duplicate notes | `idea` | High | Medium | Detect dupes by filename/content/hash, suggest which to keep by size/date |
 | Bulk move operations | `idea` | High | Medium | Move multiple files matching pattern to destination, with flatten option |
 | Bulk rename operations | `idea` | Medium | Medium | Rename files based on frontmatter or template pattern |
-| Find orphan attachments | `idea` | Medium | Small | Vault hygiene - find attachments not referenced by any note |
+| Find orphan attachments | `done` | Medium | Small | `find_orphan_attachments` tool - finds images/PDFs/etc not referenced by any note |
 | Find broken links | `idea` | Medium | Small | Vault hygiene - find internal links pointing to non-existent files |
 | Find empty notes | `idea` | Low | Small | Find notes with no meaningful content (just frontmatter or template) |
 | Find low value notes | `done` | Medium | Small | `find_low_value_notes` tool - scores notes by frontmatter, content, words, tags, links |

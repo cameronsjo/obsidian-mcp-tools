@@ -1006,4 +1006,178 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // FIND ORPHAN ATTACHMENTS - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_orphan_attachments"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "extensions?": type("string[]").describe("File extensions to check (default: common image/doc types)"),
+        "limit?": type("number").describe("Maximum results to return (default: 50)"),
+      },
+    }).describe(
+      "Find attachment files (images, PDFs, etc.) not referenced by any note. Helps reclaim space from unused files.",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 50;
+      const defaultExtensions = [
+        // Images
+        "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
+        // Documents
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        // Media
+        "mp3", "mp4", "wav", "webm", "ogg", "m4a",
+        // Archives
+        "zip", "rar", "7z", "tar", "gz",
+        // Other
+        "json", "csv", "xml",
+      ];
+      const extensions = args.extensions ?? defaultExtensions;
+      const extSet = new Set(extensions.map((e: string) => e.toLowerCase()));
+
+      // Get all files in vault
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      // Separate markdown files and potential attachments
+      const mdFiles: string[] = [];
+      const attachments: string[] = [];
+
+      for (const file of allFiles.files) {
+        if (file.endsWith(".md")) {
+          mdFiles.push(file);
+        } else {
+          const ext = file.split(".").pop()?.toLowerCase();
+          if (ext && extSet.has(ext)) {
+            attachments.push(file);
+          }
+        }
+      }
+
+      // Build a set of all referenced files from markdown content
+      const referencedFiles = new Set<string>();
+
+      for (const mdFile of mdFiles) {
+        try {
+          // Skip hidden files
+          if (await isHidden(mdFile)) continue;
+
+          const content = await makeRequest(
+            LocalRestAPI.ApiContentResponse,
+            `/vault/${encodeURIComponent(mdFile)}`,
+            { headers: { Accept: "text/markdown" } },
+          );
+
+          // Extract all potential file references
+          // Obsidian wiki-style: ![[file.png]] or [[file.pdf]]
+          const wikiLinks = content.match(/!?\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g) || [];
+          for (const link of wikiLinks) {
+            const match = link.match(/!?\[\[([^\]|]+)/);
+            if (match) {
+              const ref = match[1].trim();
+              // Add both the reference as-is and with common variations
+              referencedFiles.add(ref);
+              referencedFiles.add(ref.toLowerCase());
+              // Handle references without extension
+              for (const ext of extensions) {
+                referencedFiles.add(`${ref}.${ext}`);
+                referencedFiles.add(`${ref}.${ext}`.toLowerCase());
+              }
+            }
+          }
+
+          // Standard markdown: ![alt](path) or [text](path)
+          const mdLinks = content.match(/!?\[[^\]]*\]\(([^)]+)\)/g) || [];
+          for (const link of mdLinks) {
+            const match = link.match(/!?\[[^\]]*\]\(([^)]+)\)/);
+            if (match) {
+              let ref = match[1].trim();
+              // Remove URL encoding and query strings
+              ref = decodeURIComponent(ref.split("?")[0].split("#")[0]);
+              referencedFiles.add(ref);
+              referencedFiles.add(ref.toLowerCase());
+            }
+          }
+
+          // HTML img tags: <img src="path">
+          const imgTags = content.match(/<img[^>]+src=["']([^"']+)["']/gi) || [];
+          for (const tag of imgTags) {
+            const match = tag.match(/src=["']([^"']+)["']/i);
+            if (match) {
+              const ref = match[1].trim();
+              referencedFiles.add(ref);
+              referencedFiles.add(ref.toLowerCase());
+            }
+          }
+        } catch {
+          // Skip files that can't be read
+          continue;
+        }
+      }
+
+      // Find orphan attachments (not referenced anywhere)
+      const orphans: Array<{ path: string; extension: string; size?: number }> = [];
+
+      for (const attachment of attachments) {
+        try {
+          if (await isHidden(attachment)) continue;
+
+          // Check if this attachment is referenced
+          const filename = attachment.split("/").pop() || attachment;
+          const filenameNoExt = filename.replace(/\.[^.]+$/, "");
+          const attachmentLower = attachment.toLowerCase();
+          const filenameLower = filename.toLowerCase();
+
+          const isReferenced =
+            referencedFiles.has(attachment) ||
+            referencedFiles.has(attachmentLower) ||
+            referencedFiles.has(filename) ||
+            referencedFiles.has(filenameLower) ||
+            referencedFiles.has(filenameNoExt) ||
+            referencedFiles.has(filenameNoExt.toLowerCase());
+
+          if (!isReferenced) {
+            const ext = attachment.split(".").pop()?.toLowerCase() || "";
+            orphans.push({ path: attachment, extension: ext });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      // Sort by path and apply limit
+      orphans.sort((a, b) => a.path.localeCompare(b.path));
+      const limitedOrphans = orphans.slice(0, limit);
+
+      // Group by extension for summary
+      const byExtension: Record<string, number> = {};
+      for (const orphan of orphans) {
+        byExtension[orphan.extension] = (byExtension[orphan.extension] || 0) + 1;
+      }
+
+      const result = {
+        totalAttachmentsScanned: attachments.length,
+        totalMarkdownFiles: mdFiles.length,
+        orphanCount: orphans.length,
+        byExtension,
+        orphans: limitedOrphans,
+        truncated: orphans.length > limit,
+        hint: orphans.length > 0
+          ? "Review these files and delete unused ones with bulk_delete_files tool"
+          : "No orphan attachments found - your vault is clean!",
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
 }
