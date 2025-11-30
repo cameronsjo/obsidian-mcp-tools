@@ -1,6 +1,7 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { type, type Type } from "arktype";
 import { logger } from "./logger";
+import { sanitizeForLog } from "./sanitize";
 
 // Default to HTTPS port, fallback to HTTP if specified
 const USE_HTTP = process.env.OBSIDIAN_USE_HTTP === "true";
@@ -30,9 +31,9 @@ export async function makeRequest<
 >(schema: T, path: string, init?: RequestInit): Promise<T["infer"]> {
   const API_KEY = process.env.OBSIDIAN_API_KEY;
   if (!API_KEY) {
-    logger.error("OBSIDIAN_API_KEY environment variable is required", {
-      env: process.env,
-    });
+    // WHY: Never log process.env directly - it may contain sensitive secrets.
+    // The sanitizeForLog function redacts sensitive environment variables.
+    logger.error("OBSIDIAN_API_KEY environment variable is required");
     throw new Error("OBSIDIAN_API_KEY environment variable is required");
   }
 
@@ -59,12 +60,17 @@ export async function makeRequest<
   if (validated instanceof type.errors) {
     const stackError = new Error();
     Error.captureStackTrace(stackError, makeRequest);
-    logger.error("Invalid response from Obsidian API", {
-      status: response.status,
-      error: validated.summary,
-      stack: stackError.stack,
-      data,
-    });
+    // WHY: Sanitize log data to prevent potential data leakage in error responses.
+    // API responses may contain sensitive information that should not be logged as-is.
+    logger.error(
+      "Invalid response from Obsidian API",
+      sanitizeForLog({
+        status: response.status,
+        error: validated.summary,
+        stack: stackError.stack,
+        data,
+      }),
+    );
     throw new McpError(
       ErrorCode.InternalError,
       `${init?.method ?? "GET"} ${path} ${response.status}: ${validated.summary}`,

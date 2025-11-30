@@ -77,15 +77,15 @@ Critical issues that block core functionality.
 | Add Justfile with common tasks | `done` | High | Small | Single command for setup, dev, check, test, release with <1s task discovery |
 | Implement lefthook pre-commit hooks | `done` | High | Small | Parallel lint/typecheck/test execution to catch issues before commit |
 | Create comprehensive test suite | `idea` | High | Large | >70% coverage goal for mcp-server and obsidian-plugin packages |
-| Add .claude/commands for workflows | `idea` | Medium | Small | Commands for setup, check, ready, and test to streamline Claude Code workflows |
+| Add .claude/commands for workflows | `done` | Medium | Small | Commands for setup, check, dev, and test to streamline Claude Code workflows |
 | Add CI workflow for PR validation | `done` | High | Medium | `.github/workflows/ci.yml` - lint, typecheck, test, build, security audit |
 | Create automated setup script | `idea` | High | Medium | Achieve <5min clone-to-running for new contributors |
 | Add plugin linking/debugging docs | `idea` | Medium | Small | Step-by-step local development workflow documentation |
 | Implement test coverage reporting | `idea` | Medium | Small | Codecov or similar integration in CI for visibility |
 | OpenTelemetry tracing integration | `idea` | High | Medium | Instrument tool calls, API requests, and template execution with spans |
 | PII sanitization layer | `idea` | High | Medium | Redact sensitive data before returning to LLM clients |
-| MCP health check and capabilities resource | `idea` | Medium | Small | Expose server status, API version, and feature availability |
-| Structured logging with context propagation | `idea` | Medium | Small | Add request IDs, tool names, and user context to all log entries |
+| MCP health check and capabilities resource | `done` | Medium | Small | `health://status` and `health://capabilities` resources via MCP SDK 1.23.0 |
+| Structured logging with context propagation | `done` | Medium | Small | AsyncLocalStorage request context, structured JSON output, tool/request ID tracking |
 | Automated dependency vulnerability scanning | `done` | High | Small | Included in CI workflow - audit-ci and dependency-check |
 | TypeScript checking for Svelte files | `idea` | Medium | Small | Add svelte-check integration to catch type errors in .svelte components |
 | Vitest tests for Svelte components | `idea` | Medium | Medium | Setup Vitest with @testing-library/svelte, write component tests, integrate with CI |
@@ -103,7 +103,7 @@ Critical issues that block core functionality.
 | TLS certificate pinning for Local REST API | `idea` | High | Medium | Replace global TLS bypass with targeted self-signed cert pinning, validate only localhost connections |
 | Binary integrity verification | `done` | High | Small | SHA-256 checksum validation for downloaded MCP server binaries before execution |
 | Path traversal protection | `done` | High | Small | Vault root boundary enforcement, normalized path validation, reject .. and absolute paths outside vault |
-| Log output sanitization | `idea` | Medium | Small | Prevent API key/PII leakage, redact process.env logging, add PII detection patterns |
+| Log output sanitization | `done` | Medium | Small | `sanitizeForLog()` function with 59 test cases for API keys, emails, tokens, passwords |
 | Rate limiting on API endpoints | `idea` | Medium | Medium | Token bucket algorithm with configurable limits per tool/endpoint to prevent abuse/DoS |
-| Input size limits and validation | `idea` | Medium | Small | Prevent resource exhaustion for file content, template parameters, search queries, fetch URLs |
+| Input size limits and validation | `done` | Medium | Small | LIMITS constants and validators for file content (10MB), paths (500 chars), queries (1000 chars), bulk ops (1000 items), URLs (2048 chars) |
 | Security headers and request signing | `idea` | Medium | Medium | CSP headers, request signing/authentication between plugin and MCP server for localhost API |

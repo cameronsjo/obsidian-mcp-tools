@@ -2,6 +2,7 @@ import { logger, type ToolRegistry, ToolRegistryClass } from "$/shared";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerFetchTool } from "../fetch";
+import { registerHealthResources } from "../health";
 import { registerLocalRestApiTools } from "../local-rest-api";
 import { setupObsidianPrompts } from "../prompts";
 import { registerSmartConnectionsTools } from "../smart-connections";
@@ -15,17 +16,19 @@ import {
 export class ObsidianMcpServer {
   private server: Server;
   private tools: ToolRegistry;
+  private readonly version = "0.2.27";
 
   constructor() {
     this.server = new Server(
       {
         name: "obsidian-mcp-tools",
-        version: "0.1.0",
+        version: this.version,
       },
       {
         capabilities: {
           tools: {},
           prompts: {},
+          resources: {},
         },
       },
     );
@@ -46,6 +49,7 @@ export class ObsidianMcpServer {
   }
 
   private setupHandlers() {
+    // Register prompts
     setupObsidianPrompts(this.server);
 
     // Register legacy tools (backward compatibility)
@@ -57,6 +61,9 @@ export class ObsidianMcpServer {
     // Register new unified dispatcher tools
     // These provide the same functionality with ~70% less context usage
     registerDispatcherTools(this.tools);
+
+    // Register health check resources (after all tools are registered)
+    registerHealthResources(this.server, this.tools, this.version);
 
     this.server.setRequestHandler(ListToolsRequestSchema, this.tools.list);
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {

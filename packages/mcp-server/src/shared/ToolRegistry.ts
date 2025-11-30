@@ -5,6 +5,7 @@ import {
   type Result,
 } from "@modelcontextprotocol/sdk/types.js";
 import { type, type Type } from "arktype";
+import { runWithContext, updateContext } from "shared";
 import { formatMcpError } from "./formatMcpError.js";
 import { logger } from "./logger.js";
 
@@ -123,31 +124,50 @@ export class ToolRegistryClass<
     params: Schema["infer"],
     context: HandlerContext,
   ) => {
-    try {
-      for (const [schema, handler] of this.entries()) {
-        if (schema.get("name").allows(params.name)) {
-          const validParams = schema.assert(
-            this.coerceBooleanParams(schema, params),
-          );
-          // return await to handle runtime errors here
-          return await handler(validParams, context);
+    // Run the entire tool execution within a request context
+    return runWithContext({ toolName: params.name }, async () => {
+      try {
+        logger.info("Tool execution started", {
+          toolName: params.name,
+          hasArguments: !!params.arguments,
+        });
+
+        for (const [schema, handler] of this.entries()) {
+          if (schema.get("name").allows(params.name)) {
+            const validParams = schema.assert(
+              this.coerceBooleanParams(schema, params),
+            );
+
+            // Execute handler and measure duration
+            const result = await handler(validParams, context);
+
+            logger.info("Tool execution completed", {
+              toolName: params.name,
+            });
+
+            return result;
+          }
         }
+
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `Unknown tool: ${params.name}`,
+        );
+      } catch (error) {
+        const formattedError = formatMcpError(error);
+
+        logger.error(`Tool execution failed`, {
+          toolName: params.name,
+          errorCode: formattedError.code,
+          message: formattedError.message,
+          stack: formattedError.stack,
+          error,
+          params,
+        });
+
+        throw formattedError;
       }
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Unknown tool: ${params.name}`,
-      );
-    } catch (error) {
-      const formattedError = formatMcpError(error);
-      logger.error(`Error handling ${params.name}`, {
-        ...formattedError,
-        message: formattedError.message,
-        stack: formattedError.stack,
-        error,
-        params,
-      });
-      throw formattedError;
-    }
+    });
   };
 }
 
