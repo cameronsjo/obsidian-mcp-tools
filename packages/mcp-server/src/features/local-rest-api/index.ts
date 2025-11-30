@@ -851,4 +851,159 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       };
     },
   );
+
+  // FIND LOW VALUE NOTES - vault hygiene tool
+  tools.register(
+    type({
+      name: '"find_low_value_notes"',
+      arguments: {
+        "directory?": type("string").describe("Directory to search (default: entire vault)"),
+        "limit?": type("number").describe("Maximum notes to return (default: 20)"),
+        "minScore?": type("number").describe("Only return notes with score below this threshold (default: 50)"),
+        "includeDetails?": type("boolean").describe("Include detailed scoring breakdown (default: false)"),
+      },
+    }).describe(
+      "Find notes that may need attention: minimal frontmatter, sparse content, no links. Returns notes sorted by 'value score' (lower = less rich).",
+    ),
+    async ({ arguments: args }) => {
+      const limit = args.limit ?? 20;
+      const minScore = args.minScore ?? 50;
+      const includeDetails = args.includeDetails ?? false;
+
+      // Get all markdown files
+      const validPath = validateOptionalPath(args.directory);
+      const path = validPath ? `${validPath}/` : "";
+      const allFiles = await makeRequest(
+        LocalRestAPI.ApiVaultDirectoryResponse,
+        `/vault/${path}`,
+      );
+
+      // Filter to markdown files only
+      const mdFiles = allFiles.files.filter((f: string) => f.endsWith(".md"));
+
+      // Score each note
+      type NoteScore = {
+        path: string;
+        score: number;
+        details?: {
+          frontmatterFields: number;
+          frontmatterScore: number;
+          contentLength: number;
+          contentScore: number;
+          wordCount: number;
+          wordScore: number;
+          tagCount: number;
+          tagScore: number;
+          linkCount: number;
+          linkScore: number;
+          hasTitle: boolean;
+          titleScore: number;
+        };
+      };
+
+      const scores: NoteScore[] = [];
+
+      for (const filePath of mdFiles) {
+        try {
+          // Skip hidden files
+          if (await isHidden(filePath)) continue;
+
+          // Fetch note metadata
+          const note = await makeRequest(
+            LocalRestAPI.ApiNoteJson,
+            `/vault/${encodeURIComponent(filePath)}`,
+            { headers: { Accept: "application/vnd.olrapi.note+json" } },
+          );
+
+          // Calculate scoring components
+          const frontmatterFields = Object.keys(note.frontmatter || {}).length;
+          const content = note.content || "";
+
+          // Strip frontmatter from content for analysis
+          const contentWithoutFrontmatter = content.replace(/^---[\s\S]*?---\n?/, "").trim();
+          const contentLength = contentWithoutFrontmatter.length;
+          const wordCount = contentWithoutFrontmatter.split(/\s+/).filter((w: string) => w.length > 0).length;
+
+          // Count internal links [[...]]
+          const linkMatches = contentWithoutFrontmatter.match(/\[\[([^\]]+)\]\]/g);
+          const linkCount = linkMatches ? linkMatches.length : 0;
+
+          // Tag count
+          const tagCount = (note.tags || []).length;
+
+          // Check if note has a title (first heading or filename-based)
+          const hasTitle = /^#\s+.+/m.test(contentWithoutFrontmatter) || frontmatterFields > 0;
+
+          // Calculate component scores (each 0-20, total max 100)
+          const frontmatterScore = Math.min(frontmatterFields * 4, 20); // 5 fields = max
+          const contentScore = Math.min(Math.floor(contentLength / 50), 20); // 1000 chars = max
+          const wordScore = Math.min(Math.floor(wordCount / 10), 20); // 200 words = max
+          const tagScore = Math.min(tagCount * 5, 20); // 4 tags = max
+          const linkScore = Math.min(linkCount * 4, 20); // 5 links = max
+
+          const totalScore = frontmatterScore + contentScore + wordScore + tagScore + linkScore;
+
+          const scoreEntry: NoteScore = {
+            path: filePath,
+            score: totalScore,
+          };
+
+          if (includeDetails) {
+            scoreEntry.details = {
+              frontmatterFields,
+              frontmatterScore,
+              contentLength,
+              contentScore,
+              wordCount,
+              wordScore,
+              tagCount,
+              tagScore,
+              linkCount,
+              linkScore,
+              hasTitle,
+              titleScore: hasTitle ? 0 : -10, // Penalty shown but not applied to keep max at 100
+            };
+          }
+
+          scores.push(scoreEntry);
+        } catch {
+          // Skip files that can't be read (binary, etc.)
+          continue;
+        }
+      }
+
+      // Sort by score ascending (lowest value first)
+      scores.sort((a, b) => a.score - b.score);
+
+      // Filter to notes below threshold and apply limit
+      const lowValueNotes = scores
+        .filter((n) => n.score < minScore)
+        .slice(0, limit);
+
+      const result = {
+        totalNotesScanned: mdFiles.length,
+        notesAnalyzed: scores.length,
+        lowValueCount: scores.filter((n) => n.score < minScore).length,
+        threshold: minScore,
+        notes: lowValueNotes,
+        scoringGuide: {
+          max: 100,
+          components: {
+            frontmatter: "0-20 (4 pts per field, max 5 fields)",
+            content: "0-20 (1 pt per 50 chars, max 1000 chars)",
+            words: "0-20 (1 pt per 10 words, max 200 words)",
+            tags: "0-20 (5 pts per tag, max 4 tags)",
+            links: "0-20 (4 pts per [[link]], max 5 links)",
+          },
+        },
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
 }
