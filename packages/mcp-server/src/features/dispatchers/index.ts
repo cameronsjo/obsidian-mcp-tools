@@ -101,23 +101,35 @@ const activeFileToolSchema = type({
   "Operations on the currently active file. Operations: read, update, append, patch, delete. Use discover() to see detailed parameters.",
 );
 
-const pluginToolSchema = type({
-  name: '"plugin"',
-  arguments: {
-    plugin: type("string").describe(`Plugin to use: ${listPlugins().join(", ")}`),
-    operation: type("string").describe("Operation to perform"),
-    "query?": type("string").describe("Search query"),
-    "folders?": type("string[]").describe("Folders to include"),
-    "excludeFolders?": type("string[]").describe("Folders to exclude"),
-    "limit?": type("number").describe("Max results"),
-    "name?": type("string").describe("Template file path"),
-    "arguments?": type("Record<string, string>").describe("Template arguments"),
-    "createFile?": type("boolean").describe("Create file from template"),
-    "targetPath?": type("string").describe("Target path for created file"),
-  },
-}).describe(
-  "Execute plugin operations. Use discover({ category: 'plugins' }) to see available plugins and operations.",
-);
+/**
+ * Build plugin tool schema dynamically
+ *
+ * This function is called at registration time, not module load time,
+ * so plugins will be registered by the time this runs.
+ * Fixes PR-1#2: listPlugins() was called at schema definition time.
+ */
+function buildPluginToolSchema() {
+  const plugins = listPlugins();
+  const pluginList = plugins.length > 0 ? plugins.join(", ") : "smart-connections, templater";
+
+  return type({
+    name: '"plugin"',
+    arguments: {
+      plugin: type("string").describe(`Plugin to use: ${pluginList}`),
+      operation: type("string").describe("Operation to perform"),
+      "query?": type("string").describe("Search query"),
+      "folders?": type("string[]").describe("Folders to include"),
+      "excludeFolders?": type("string[]").describe("Folders to exclude"),
+      "limit?": type("number").describe("Max results"),
+      "name?": type("string").describe("Template file path"),
+      "arguments?": type("Record<string, string>").describe("Template arguments"),
+      "createFile?": type("boolean").describe("Create file from template"),
+      "targetPath?": type("string").describe("Target path for created file"),
+    },
+  }).describe(
+    "Execute plugin operations. Use discover({ category: 'plugins' }) to see available plugins and operations.",
+  );
+}
 
 const discoverToolSchema = type({
   name: '"discover"',
@@ -189,7 +201,7 @@ export function registerDispatcherTools(
 
   // PLUGIN dispatcher
   if (cfg.dispatchers.plugin) {
-    tools.register(pluginToolSchema, async ({ arguments: args }) => {
+    tools.register(buildPluginToolSchema(), async ({ arguments: args }) => {
       const { plugin, operation, ...params } = args;
       const cleanParams: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(params)) {

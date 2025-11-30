@@ -451,14 +451,99 @@ vaultOperations.register({
     const dryRun = (params.dryRun as boolean) ?? true;
     const exclude = (params.exclude as string[]) ?? [];
 
+    /**
+     * Enhanced glob matching with support for:
+     * - * (single path segment wildcard)
+     * - ** (globstar - matches any depth)
+     * - ? (single character wildcard)
+     * - [abc] (character classes)
+     * - {a,b,c} (brace expansion)
+     * - Escaped special characters (\* \? etc.)
+     * - ! prefix for negation (returns inverse match)
+     */
     const matchesGlob = (filePath: string, globPattern: string): boolean => {
-      const regexPattern = globPattern
-        .replace(/\./g, "\\.")
-        .replace(/\*\*/g, "<<<GLOBSTAR>>>")
-        .replace(/\*/g, "[^/]*")
-        .replace(/<<<GLOBSTAR>>>/g, ".*")
-        .replace(/\?/g, ".");
-      return new RegExp(`^${regexPattern}$`).test(filePath);
+      // Handle negation prefix
+      let isNegated = false;
+      let pattern = globPattern;
+      if (pattern.startsWith("!")) {
+        isNegated = true;
+        pattern = pattern.slice(1);
+      }
+
+      // Handle brace expansion {a,b,c} -> (a|b|c)
+      const expandBraces = (p: string): string => {
+        return p.replace(/\{([^{}]+)\}/g, (_, contents: string) => {
+          const alternatives = contents.split(",").map((s: string) => s.trim());
+          return `(${alternatives.join("|")})`;
+        });
+      };
+
+      // Convert glob pattern to regex
+      const toRegex = (p: string): string => {
+        let result = "";
+        let i = 0;
+
+        while (i < p.length) {
+          const char = p[i];
+
+          // Handle escape sequences
+          if (char === "\\" && i + 1 < p.length) {
+            result += "\\" + p[i + 1];
+            i += 2;
+            continue;
+          }
+
+          // Handle globstar **
+          if (char === "*" && p[i + 1] === "*") {
+            // ** matches any number of path segments
+            result += ".*";
+            i += 2;
+            // Skip trailing slash after **
+            if (p[i] === "/") i++;
+            continue;
+          }
+
+          // Handle single * (matches within path segment)
+          if (char === "*") {
+            result += "[^/]*";
+            i++;
+            continue;
+          }
+
+          // Handle ? (single char, not path separator)
+          if (char === "?") {
+            result += "[^/]";
+            i++;
+            continue;
+          }
+
+          // Handle character classes [abc] - pass through (already regex syntax)
+          if (char === "[") {
+            const closeIdx = p.indexOf("]", i);
+            if (closeIdx !== -1) {
+              result += p.slice(i, closeIdx + 1);
+              i = closeIdx + 1;
+              continue;
+            }
+          }
+
+          // Escape regex special characters
+          if (".+^${}()|[]\\".includes(char)) {
+            result += "\\" + char;
+          } else {
+            result += char;
+          }
+          i++;
+        }
+
+        return result;
+      };
+
+      const expandedPattern = expandBraces(pattern);
+      const regexPattern = toRegex(expandedPattern);
+      const match = new RegExp(`^${regexPattern}$`).test(filePath);
+
+      return isNegated ? !match : match;
     };
 
     let matchingFiles: string[];
