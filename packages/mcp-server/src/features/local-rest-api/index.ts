@@ -552,33 +552,29 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
     },
   );
 
-  // BULK DELETE by pattern (glob)
+  // BULK DELETE - unified tool for pattern, regex, or search-based deletion
   tools.register(
     type({
-      name: '"bulk_delete_by_pattern"',
+      name: '"bulk_delete_files"',
       arguments: {
-        pattern: type("string").describe("Glob pattern to match files (e.g., '**/*.bak', 'archive/*.md')"),
+        match: type("string").describe("The pattern, regex, or search query to match files"),
+        "type?": type('"glob" | "regex" | "search"').describe("How to interpret 'match': glob pattern, regex, or search query (default: glob)"),
+        "flags?": type("string").describe("Regex flags when type is 'regex' (e.g., 'i' for case-insensitive)"),
+        "exclude?": type("string[]").describe("Patterns to exclude (interpreted same as 'type')"),
         "dryRun?": type("boolean").describe("If true (default), only list files without deleting"),
-        "exclude?": type("string[]").describe("Patterns to exclude from deletion"),
-        "limit?": type("number").describe("Maximum files to delete (default: 100)"),
+        "limit?": type("number").describe("Maximum files to process (default: 100)"),
       },
     }).describe(
-      "Delete vault files matching a glob pattern. Default is dry-run mode for safety.",
+      "Delete multiple vault files matching a glob pattern, regex, or search query. Defaults to dry-run mode for safety.",
     ),
     async ({ arguments: args }) => {
+      const matchType = args.type ?? "glob";
       const limit = args.limit ?? 100;
       const dryRun = args.dryRun ?? true;
       const exclude = args.exclude ?? [];
 
-      // Get all vault files
-      const allFiles = await makeRequest(
-        LocalRestAPI.ApiVaultDirectoryResponse,
-        "/vault/",
-      );
-
-      // Helper to match glob pattern (simple implementation)
+      // Helper to match glob pattern
       const matchesGlob = (filePath: string, globPattern: string): boolean => {
-        // Convert glob to regex
         const regexPattern = globPattern
           .replace(/\./g, "\\.")
           .replace(/\*\*/g, "<<<GLOBSTAR>>>")
@@ -588,136 +584,85 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         return new RegExp(`^${regexPattern}$`).test(filePath);
       };
 
-      // Filter files matching pattern but not excluded
-      const matchingFiles = allFiles.files.filter((file: string) => {
-        if (!matchesGlob(file, args.pattern)) return false;
-        for (const excludePattern of exclude) {
-          if (matchesGlob(file, excludePattern)) return false;
-        }
-        return true;
-      });
+      let matchingFiles: string[];
 
-      const filesToProcess = matchingFiles.slice(0, limit);
-      const truncated = matchingFiles.length > limit;
+      if (matchType === "search") {
+        // Search-based matching
+        const searchResults = await makeRequest(
+          LocalRestAPI.ApiSimpleSearchResponse,
+          `/search/simple/?query=${encodeURIComponent(args.match)}`,
+          { method: "POST" },
+        );
+        matchingFiles = [...new Set(
+          searchResults.map((result: { filename: string }) => result.filename)
+        )];
 
-      if (dryRun) {
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              mode: "dry-run",
-              pattern: args.pattern,
-              matchCount: matchingFiles.length,
-              wouldDelete: filesToProcess,
-              truncated,
-              message: truncated
-                ? `Showing first ${limit} of ${matchingFiles.length} matches. Set dryRun: false to delete.`
-                : `Found ${matchingFiles.length} files matching pattern. Set dryRun: false to delete.`,
-            }, null, 2),
-          }],
-        };
-      }
-
-      // Actually delete files
-      const deleted: string[] = [];
-      const failed: Array<{ file: string; error: string }> = [];
-
-      for (const file of filesToProcess) {
-        try {
-          const validPath = validateVaultPath(file);
-          await makeRequest(
-            LocalRestAPI.ApiNoContentResponse,
-            `/vault/${encodeURIComponent(validPath)}`,
-            { method: "DELETE" },
-          );
-          deleted.push(file);
-        } catch (error) {
-          failed.push({
-            file,
-            error: error instanceof Error ? error.message : String(error),
+        // Apply exclusions as glob patterns
+        if (exclude.length > 0) {
+          matchingFiles = matchingFiles.filter((file: string) => {
+            for (const excludePattern of exclude) {
+              if (matchesGlob(file, excludePattern)) return false;
+            }
+            return true;
           });
         }
-      }
-
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            mode: "delete",
-            pattern: args.pattern,
-            deleted,
-            failed,
-            deletedCount: deleted.length,
-            failedCount: failed.length,
-            truncated,
-          }, null, 2),
-        }],
-      };
-    },
-  );
-
-  // BULK DELETE by regex
-  tools.register(
-    type({
-      name: '"bulk_delete_by_regex"',
-      arguments: {
-        regex: type("string").describe("Regex pattern to match file paths"),
-        "flags?": type("string").describe("Regex flags (e.g., 'i' for case-insensitive)"),
-        "dryRun?": type("boolean").describe("If true (default), only list files without deleting"),
-        "exclude?": type("string[]").describe("Regex patterns to exclude from deletion"),
-        "limit?": type("number").describe("Maximum files to delete (default: 100)"),
-      },
-    }).describe(
-      "Delete vault files with paths matching a regex. Default is dry-run mode for safety.",
-    ),
-    async ({ arguments: args }) => {
-      const limit = args.limit ?? 100;
-      const dryRun = args.dryRun ?? true;
-      const exclude = args.exclude ?? [];
-
-      // Compile regex patterns
-      let matchRegex: RegExp;
-      try {
-        matchRegex = new RegExp(args.regex, args.flags);
-      } catch (error) {
-        return {
-          content: [{
-            type: "text",
-            text: `Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`,
-          }],
-          isError: true,
-        };
-      }
-
-      const excludeRegexes: RegExp[] = [];
-      for (const excludePattern of exclude) {
+      } else if (matchType === "regex") {
+        // Regex-based matching
+        let matchRegex: RegExp;
         try {
-          excludeRegexes.push(new RegExp(excludePattern, args.flags));
+          matchRegex = new RegExp(args.match, args.flags);
         } catch (error) {
           return {
             content: [{
               type: "text",
-              text: `Invalid exclude regex pattern "${excludePattern}": ${error instanceof Error ? error.message : String(error)}`,
+              text: `Invalid regex pattern: ${error instanceof Error ? error.message : String(error)}`,
             }],
             isError: true,
           };
         }
-      }
 
-      // Get all vault files
-      const allFiles = await makeRequest(
-        LocalRestAPI.ApiVaultDirectoryResponse,
-        "/vault/",
-      );
-
-      // Filter files matching pattern but not excluded
-      const matchingFiles = allFiles.files.filter((file: string) => {
-        if (!matchRegex.test(file)) return false;
-        for (const excludeRegex of excludeRegexes) {
-          if (excludeRegex.test(file)) return false;
+        const excludeRegexes: RegExp[] = [];
+        for (const excludePattern of exclude) {
+          try {
+            excludeRegexes.push(new RegExp(excludePattern, args.flags));
+          } catch (error) {
+            return {
+              content: [{
+                type: "text",
+                text: `Invalid exclude regex "${excludePattern}": ${error instanceof Error ? error.message : String(error)}`,
+              }],
+              isError: true,
+            };
+          }
         }
-        return true;
-      });
+
+        const allFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          "/vault/",
+        );
+
+        matchingFiles = allFiles.files.filter((file: string) => {
+          if (!matchRegex.test(file)) return false;
+          for (const excludeRegex of excludeRegexes) {
+            if (excludeRegex.test(file)) return false;
+          }
+          return true;
+        });
+      } else {
+        // Glob-based matching (default)
+        const allFiles = await makeRequest(
+          LocalRestAPI.ApiVaultDirectoryResponse,
+          "/vault/",
+        );
+
+        matchingFiles = allFiles.files.filter((file: string) => {
+          if (!matchesGlob(file, args.match)) return false;
+          for (const excludePattern of exclude) {
+            if (matchesGlob(file, excludePattern)) return false;
+          }
+          return true;
+        });
+      }
 
       const filesToProcess = matchingFiles.slice(0, limit);
       const truncated = matchingFiles.length > limit;
@@ -728,14 +673,14 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
             type: "text",
             text: JSON.stringify({
               mode: "dry-run",
-              regex: args.regex,
-              flags: args.flags,
+              matchType,
+              match: args.match,
               matchCount: matchingFiles.length,
               wouldDelete: filesToProcess,
               truncated,
               message: truncated
                 ? `Showing first ${limit} of ${matchingFiles.length} matches. Set dryRun: false to delete.`
-                : `Found ${matchingFiles.length} files matching regex. Set dryRun: false to delete.`,
+                : `Found ${matchingFiles.length} files. Set dryRun: false to delete.`,
             }, null, 2),
           }],
         };
@@ -767,94 +712,8 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
           type: "text",
           text: JSON.stringify({
             mode: "delete",
-            regex: args.regex,
-            deleted,
-            failed,
-            deletedCount: deleted.length,
-            failedCount: failed.length,
-            truncated,
-          }, null, 2),
-        }],
-      };
-    },
-  );
-
-  // BULK DELETE by search query
-  tools.register(
-    type({
-      name: '"bulk_delete_by_query"',
-      arguments: {
-        query: type("string").describe("Search query to find files to delete"),
-        "dryRun?": type("boolean").describe("If true (default), only list files without deleting"),
-        "limit?": type("number").describe("Maximum files to delete (default: 50)"),
-      },
-    }).describe(
-      "Delete vault files returned by a search query. Uses Obsidian's simple search. Default is dry-run mode for safety.",
-    ),
-    async ({ arguments: args }) => {
-      const limit = args.limit ?? 50;
-      const dryRun = args.dryRun ?? true;
-
-      // Search for files
-      const searchResults = await makeRequest(
-        LocalRestAPI.ApiSimpleSearchResponse,
-        `/search/simple/?query=${encodeURIComponent(args.query)}`,
-        { method: "POST" },
-      );
-
-      // Extract unique file paths from search results
-      const matchingFiles = [...new Set(
-        searchResults.map((result: { filename: string }) => result.filename)
-      )];
-
-      const filesToProcess = matchingFiles.slice(0, limit);
-      const truncated = matchingFiles.length > limit;
-
-      if (dryRun) {
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              mode: "dry-run",
-              query: args.query,
-              matchCount: matchingFiles.length,
-              wouldDelete: filesToProcess,
-              truncated,
-              message: truncated
-                ? `Showing first ${limit} of ${matchingFiles.length} matches. Set dryRun: false to delete.`
-                : `Found ${matchingFiles.length} files matching query. Set dryRun: false to delete.`,
-            }, null, 2),
-          }],
-        };
-      }
-
-      // Actually delete files
-      const deleted: string[] = [];
-      const failed: Array<{ file: string; error: string }> = [];
-
-      for (const file of filesToProcess) {
-        try {
-          const validPath = validateVaultPath(file);
-          await makeRequest(
-            LocalRestAPI.ApiNoContentResponse,
-            `/vault/${encodeURIComponent(validPath)}`,
-            { method: "DELETE" },
-          );
-          deleted.push(file);
-        } catch (error) {
-          failed.push({
-            file,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            mode: "delete",
-            query: args.query,
+            matchType,
+            match: args.match,
             deleted,
             failed,
             deletedCount: deleted.length,
