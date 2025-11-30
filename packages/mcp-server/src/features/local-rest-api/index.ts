@@ -2,6 +2,10 @@ import {
   makeRequest,
   validateVaultPath,
   validateOptionalPath,
+  assertNotProtected,
+  assertNotReadonly,
+  isHidden,
+  MCP_TAGS,
   type ToolRegistry,
 } from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -60,8 +64,24 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       arguments: {
         content: "string",
       },
-    }).describe("Update the content of the active file open in Obsidian."),
+    }).describe("Update the content of the active file open in Obsidian. Respects mcp-readonly tag."),
     async ({ arguments: args }) => {
+      // Check if active file is readonly
+      const activeFile = await makeRequest(
+        LocalRestAPI.ApiNoteJson,
+        "/active/",
+        { headers: { Accept: "application/vnd.olrapi.note+json" } },
+      );
+      if (activeFile.tags?.includes(MCP_TAGS.READONLY)) {
+        return {
+          content: [{
+            type: "text",
+            text: `Cannot update: file is read-only (has ${MCP_TAGS.READONLY} tag)`,
+          }],
+          isError: true,
+        };
+      }
+
       await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
         method: "PUT",
         body: args.content,
@@ -79,8 +99,24 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       arguments: {
         content: "string",
       },
-    }).describe("Append content to the end of the currently-open note."),
+    }).describe("Append content to the end of the currently-open note. Respects mcp-readonly tag."),
     async ({ arguments: args }) => {
+      // Check if active file is readonly
+      const activeFile = await makeRequest(
+        LocalRestAPI.ApiNoteJson,
+        "/active/",
+        { headers: { Accept: "application/vnd.olrapi.note+json" } },
+      );
+      if (activeFile.tags?.includes(MCP_TAGS.READONLY)) {
+        return {
+          content: [{
+            type: "text",
+            text: `Cannot append: file is read-only (has ${MCP_TAGS.READONLY} tag)`,
+          }],
+          isError: true,
+        };
+      }
+
       await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
         method: "POST",
         body: args.content,
@@ -97,9 +133,25 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       name: '"patch_active_file"',
       arguments: LocalRestAPI.ApiPatchParameters,
     }).describe(
-      "Insert or modify content in the currently-open note relative to a heading, block reference, or frontmatter field.",
+      "Insert or modify content in the currently-open note relative to a heading, block reference, or frontmatter field. Respects mcp-readonly tag.",
     ),
     async ({ arguments: args }) => {
+      // Check if active file is readonly
+      const activeFile = await makeRequest(
+        LocalRestAPI.ApiNoteJson,
+        "/active/",
+        { headers: { Accept: "application/vnd.olrapi.note+json" } },
+      );
+      if (activeFile.tags?.includes(MCP_TAGS.READONLY)) {
+        return {
+          content: [{
+            type: "text",
+            text: `Cannot patch: file is read-only (has ${MCP_TAGS.READONLY} tag)`,
+          }],
+          isError: true,
+        };
+      }
+
       const headers: Record<string, string> = {
         Operation: args.operation,
         "Target-Type": args.targetType,
@@ -140,8 +192,24 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
     type({
       name: '"delete_active_file"',
       arguments: "Record<string, unknown>",
-    }).describe("Delete the currently-active file in Obsidian."),
+    }).describe("Delete the currently-active file in Obsidian. Respects mcp-protected tag."),
     async () => {
+      // Check if active file is protected
+      const activeFile = await makeRequest(
+        LocalRestAPI.ApiNoteJson,
+        "/active/",
+        { headers: { Accept: "application/vnd.olrapi.note+json" } },
+      );
+      if (activeFile.tags?.includes(MCP_TAGS.PROTECTED)) {
+        return {
+          content: [{
+            type: "text",
+            text: `Cannot delete: file is protected (has ${MCP_TAGS.PROTECTED} tag)`,
+          }],
+          isError: true,
+        };
+      }
+
       await makeRequest(LocalRestAPI.ApiNoContentResponse, "/active/", {
         method: "DELETE",
       });
@@ -313,9 +381,26 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         filename: "string",
         content: "string",
       },
-    }).describe("Create a new file in your vault or update an existing one."),
+    }).describe("Create a new file in your vault or update an existing one. Respects mcp-readonly tag for existing files."),
     async ({ arguments: args }) => {
       const validPath = validateVaultPath(args.filename);
+
+      // Check if existing file is readonly (new files are fine)
+      try {
+        await assertNotReadonly(validPath);
+      } catch (error) {
+        // If it's a readonly error, return it; otherwise the file doesn't exist (fine to create)
+        if (error instanceof Error && error.message.includes("read-only")) {
+          return {
+            content: [{
+              type: "text",
+              text: `Cannot overwrite: file is read-only (has ${MCP_TAGS.READONLY} tag)`,
+            }],
+            isError: true,
+          };
+        }
+      }
+
       await makeRequest(
         LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(validPath)}`,
@@ -338,9 +423,25 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         filename: "string",
         content: "string",
       },
-    }).describe("Append content to a new or existing file."),
+    }).describe("Append content to a new or existing file. Respects mcp-readonly tag."),
     async ({ arguments: args }) => {
       const validPath = validateVaultPath(args.filename);
+
+      // Check if file is readonly (if it exists)
+      try {
+        await assertNotReadonly(validPath);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("read-only")) {
+          return {
+            content: [{
+              type: "text",
+              text: `Cannot append: file is read-only (has ${MCP_TAGS.READONLY} tag)`,
+            }],
+            isError: true,
+          };
+        }
+      }
+
       await makeRequest(
         LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(validPath)}`,
@@ -363,10 +464,14 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         filename: "string",
       }).and(LocalRestAPI.ApiPatchParameters),
     }).describe(
-      "Insert or modify content in a file relative to a heading, block reference, or frontmatter field.",
+      "Insert or modify content in a file relative to a heading, block reference, or frontmatter field. Respects mcp-readonly tag.",
     ),
     async ({ arguments: args }) => {
       const validPath = validateVaultPath(args.filename);
+
+      // Check if file is readonly
+      await assertNotReadonly(validPath);
+
       const headers: HeadersInit = {
         Operation: args.operation,
         "Target-Type": args.targetType,
@@ -410,9 +515,13 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       arguments: {
         filename: "string",
       },
-    }).describe("Delete a file from your vault."),
+    }).describe("Delete a file from your vault. Respects mcp-protected tag."),
     async ({ arguments: args }) => {
       const validPath = validateVaultPath(args.filename);
+
+      // Check if file is protected
+      await assertNotProtected(validPath);
+
       await makeRequest(
         LocalRestAPI.ApiNoContentResponse,
         `/vault/${encodeURIComponent(validPath)}`,
@@ -436,11 +545,14 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         "overwrite?": type("boolean").describe("Overwrite destination if it exists (default: false)"),
       },
     }).describe(
-      "Move a file from one location to another in your vault. This reads the source file, writes it to the destination, and deletes the source.",
+      "Move a file from one location to another in your vault. Respects mcp-protected tag.",
     ),
     async ({ arguments: args }) => {
       const sourcePath = validateVaultPath(args.source);
       const destPath = validateVaultPath(args.destination);
+
+      // Check if source is protected (can't move protected files)
+      await assertNotProtected(sourcePath);
 
       // Check if destination exists (unless overwrite is true)
       if (!args.overwrite) {
@@ -507,10 +619,13 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         newName: type("string").describe("New filename (just the name, not path)"),
       },
     }).describe(
-      "Rename a file in your vault, keeping it in the same directory.",
+      "Rename a file in your vault, keeping it in the same directory. Respects mcp-protected tag.",
     ),
     async ({ arguments: args }) => {
       const sourcePath = validateVaultPath(args.filename);
+
+      // Check if file is protected
+      await assertNotProtected(sourcePath);
 
       // Extract directory from source path
       const lastSlash = sourcePath.lastIndexOf("/");
@@ -686,13 +801,23 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         };
       }
 
-      // Actually delete files
+      // Actually delete files (respecting mcp-protected tag)
       const deleted: string[] = [];
+      const skipped: string[] = [];
       const failed: Array<{ file: string; error: string }> = [];
 
       for (const file of filesToProcess) {
         try {
           const validPath = validateVaultPath(file);
+
+          // Check if file is protected before deleting
+          try {
+            await assertNotProtected(validPath);
+          } catch {
+            skipped.push(file);
+            continue;
+          }
+
           await makeRequest(
             LocalRestAPI.ApiNoContentResponse,
             `/vault/${encodeURIComponent(validPath)}`,
@@ -715,8 +840,10 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
             matchType,
             match: args.match,
             deleted,
+            skipped,
             failed,
             deletedCount: deleted.length,
+            skippedCount: skipped.length,
             failedCount: failed.length,
             truncated,
           }, null, 2),
