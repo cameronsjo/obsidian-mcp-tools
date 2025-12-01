@@ -7,6 +7,7 @@ import { setupObsidianPrompts } from "../prompts";
 import { registerSmartConnectionsTools } from "../smart-connections";
 import { registerTemplaterTools } from "../templates";
 import { registerDispatcherTools } from "../dispatchers";
+import { registerExecuteTool } from "../execute";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -57,6 +58,10 @@ export class ObsidianMcpServer {
     // Register new unified dispatcher tools
     // These provide the same functionality with ~70% less context usage
     registerDispatcherTools(this.tools);
+
+    // Register Tool-as-Code execution
+    // Enables LLMs to write JavaScript code that interacts with the vault
+    registerExecuteTool(this.tools);
 
     this.server.setRequestHandler(ListToolsRequestSchema, this.tools.list);
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {

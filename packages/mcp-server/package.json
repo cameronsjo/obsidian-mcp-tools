@@ -17,7 +17,9 @@
     "test": "bun test ./src/**/*.test.ts"
   },
   "dependencies": {
+    "@jitl/quickjs-ng-wasmfile-release-sync": "^0.31.0",
     "@modelcontextprotocol/sdk": "^1.23.0",
+    "@sebastianwessel/quickjs": "^3.0.0",
     "acorn": "^8.14.0",
     "acorn-walk": "^8.3.4",
     "arktype": "2.0.0-rc.30",
