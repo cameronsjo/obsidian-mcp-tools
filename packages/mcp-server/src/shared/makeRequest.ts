@@ -1,16 +1,13 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { type, type Type } from "arktype";
 import { logger } from "./logger";
+import { getSafeEnvForLogging } from "./sanitize";
+import { getBaseUrl, initializeTlsConfig } from "./tlsConfig";
 
-// Default to HTTPS port, fallback to HTTP if specified
-const USE_HTTP = process.env.OBSIDIAN_USE_HTTP === "true";
-const PORT = USE_HTTP ? 27123 : 27124;
-const PROTOCOL = USE_HTTP ? "http" : "https";
-const HOST = process.env.OBSIDIAN_HOST || "127.0.0.1";
-export const BASE_URL = `${PROTOCOL}://${HOST}:${PORT}`;
-
-// Disable TLS certificate validation for local self-signed certificates
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+// Initialize TLS configuration with localhost validation
+// This validates that we're only connecting to localhost before bypassing TLS
+const tlsConfig = initializeTlsConfig();
+export const BASE_URL = getBaseUrl(tlsConfig);
 
 /**
  * Makes a request to the Obsidian Local REST API with the provided path and optional request options.
@@ -24,14 +21,16 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 export async function makeRequest<
   T extends
-  | Type<{}, {}>
-  | Type<null | undefined, {}>
-  | Type<{} | null | undefined, {}>,
+    | Type<{}, {}>
+    | Type<null | undefined, {}>
+    | Type<{} | null | undefined, {}>,
 >(schema: T, path: string, init?: RequestInit): Promise<T["infer"]> {
   const API_KEY = process.env.OBSIDIAN_API_KEY;
   if (!API_KEY) {
+    // Security: Only log safe environment variables, never the full process.env
     logger.error("OBSIDIAN_API_KEY environment variable is required", {
-      env: process.env,
+      configuredEnv: getSafeEnvForLogging(),
+      hint: "Set OBSIDIAN_API_KEY to the API key from Local REST API plugin settings",
     });
     throw new Error("OBSIDIAN_API_KEY environment variable is required");
   }

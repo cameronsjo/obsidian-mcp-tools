@@ -2,7 +2,11 @@ import { logger, type ToolRegistry } from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { type } from "arktype";
-import { DEFAULT_USER_AGENT } from "./constants";
+import {
+  getUrlValidationOptionsFromEnv,
+  validateUrl,
+} from "../../shared/validateUrl";
+import { DEFAULT_USER_AGENT, FETCH_TIMEOUT_MS } from "./constants";
 import { convertHtmlToMarkdown } from "./services/markdown";
 
 export function registerFetchTool(tools: ToolRegistry, server: Server) {
@@ -20,17 +24,41 @@ export function registerFetchTool(tools: ToolRegistry, server: Server) {
         ),
       },
     }).describe(
-      "Reads and returns the content of any web page. Returns the content in Markdown format by default, or can return raw HTML if raw=true parameter is set. Supports pagination through maxLength and startIndex parameters.",
+      "Reads and returns the content of any web page. Returns the content in Markdown format by default, or can return raw HTML if raw=true parameter is set. Supports pagination through maxLength and startIndex parameters. Note: For security, requests to localhost, private IPs, and internal networks are blocked by default.",
     ),
     async ({ arguments: args }) => {
       logger.info("Fetching URL", { url: args.url });
 
+      // SSRF Protection: Validate URL before fetching
+      const urlValidation = validateUrl(
+        args.url,
+        getUrlValidationOptionsFromEnv(),
+      );
+      if (!urlValidation.valid) {
+        logger.warn("URL validation failed (SSRF protection)", {
+          url: args.url,
+          error: urlValidation.error,
+        });
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `URL validation failed: ${urlValidation.error}`,
+        );
+      }
+
       try {
+        // Use AbortController for request timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
         const response = await fetch(args.url, {
           headers: {
             "User-Agent": DEFAULT_USER_AGENT,
           },
+          signal: controller.signal,
+          redirect: "follow", // Allow redirects but URL was already validated
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new McpError(

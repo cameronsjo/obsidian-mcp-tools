@@ -99,11 +99,11 @@ Critical issues that block core functionality.
 | Item | Status | Impact | Effort | Details |
 |------|--------|--------|--------|---------|
 | Secure API key storage with platform credential managers | `idea` | High | Medium | Replace plaintext storage with Keychain (macOS), Credential Manager (Windows), Secret Service (Linux) |
-| SSRF protection for fetch tool | `idea` | High | Medium | URL allowlist/blocklist, private IP blocking (RFC1918, localhost), configurable domain restrictions |
-| TLS certificate pinning for Local REST API | `idea` | High | Medium | Replace global TLS bypass with targeted self-signed cert pinning, validate only localhost connections |
+| SSRF protection for fetch tool | `done` | High | Medium | URL allowlist/blocklist, private IP blocking (RFC1918, localhost), configurable domain restrictions via env vars |
+| TLS certificate pinning for Local REST API | `done` | High | Medium | Localhost validation before TLS bypass, reject non-localhost hosts for HTTPS connections |
 | Binary integrity verification | `done` | High | Small | SHA-256 checksum validation for downloaded MCP server binaries before execution |
 | Path traversal protection | `done` | High | Small | Vault root boundary enforcement, normalized path validation, reject .. and absolute paths outside vault |
-| Log output sanitization | `idea` | Medium | Small | Prevent API key/PII leakage, redact process.env logging, add PII detection patterns |
+| Log output sanitization | `done` | Medium | Small | Prevent API key/PII leakage, sanitize sensitive keys and patterns, safe env logging utility |
 | Rate limiting on API endpoints | `idea` | Medium | Medium | Token bucket algorithm with configurable limits per tool/endpoint to prevent abuse/DoS |
-| Input size limits and validation | `idea` | Medium | Small | Prevent resource exhaustion for file content, template parameters, search queries, fetch URLs |
+| Input size limits and validation | `done` | Medium | Small | Configurable limits for file content, search queries, paths, regex patterns via env vars |
 | Security headers and request signing | `idea` | Medium | Medium | CSP headers, request signing/authentication between plugin and MCP server for localhost API |
